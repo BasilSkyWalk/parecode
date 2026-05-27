@@ -15,6 +15,7 @@ export interface SearchResult {
     file: string;
     content: string;
     lineRanges: Array<[number, number]>;
+    omittedLineRanges?: Array<[number, number]>;
   }>;
 }
 
@@ -48,7 +49,7 @@ export class SearchEngine {
     }
 
     const lines = stdout.split("\n").filter(Boolean);
-    const fileMatches = new Map<string, { linesMap: Map<number, string> }>();
+    const fileMatches = new Map<string, { linesMap: Map<number, string>; matchLines: Set<number> }>();
 
     for (const line of lines) {
       try {
@@ -59,9 +60,12 @@ export class SearchEngine {
           const text = parsed.data.lines.text;
           
           if (!fileMatches.has(file)) {
-            fileMatches.set(file, { linesMap: new Map() });
+            fileMatches.set(file, { linesMap: new Map(), matchLines: new Set() });
           }
           fileMatches.get(file)!.linesMap.set(lineNum, text);
+          if (parsed.type === "match") {
+            fileMatches.get(file)!.matchLines.add(lineNum);
+          }
         }
       } catch (err) {
         // ignore parse errors
@@ -72,18 +76,99 @@ export class SearchEngine {
     const matches: NonNullable<SearchResult["matches"]> = [];
 
     for (const [file, data] of fileMatches.entries()) {
-      const lineNumbers = Array.from(data.linesMap.keys()).sort((a, b) => a - b);
-      if (lineNumbers.length === 0) continue;
+      const allLineNumbers = Array.from(data.linesMap.keys()).sort((a, b) => a - b);
+      if (allLineNumbers.length === 0) continue;
+
+      let totalBytes = 0;
+      for (const text of data.linesMap.values()) {
+        totalBytes += Buffer.byteLength(text, "utf8");
+      }
+
+      let includedLines = new Set(allLineNumbers);
+
+      if (args.maxBytesPerFile && totalBytes > args.maxBytesPerFile) {
+        includedLines = new Set<number>();
+        let currentBytes = 0;
+        
+        for (const matchLine of data.matchLines) {
+          const text = data.linesMap.get(matchLine)!;
+          const len = Buffer.byteLength(text, "utf8");
+          if (currentBytes + len <= args.maxBytesPerFile) {
+            includedLines.add(matchLine);
+            currentBytes += len;
+          }
+        }
+
+        let expanded = true;
+        let distance = 1;
+        while (expanded) {
+          expanded = false;
+          for (const matchLine of data.matchLines) {
+            const prevLine = matchLine - distance;
+            if (data.linesMap.has(prevLine) && !includedLines.has(prevLine)) {
+              const text = data.linesMap.get(prevLine)!;
+              const len = Buffer.byteLength(text, "utf8");
+              if (currentBytes + len <= args.maxBytesPerFile) {
+                includedLines.add(prevLine);
+                currentBytes += len;
+                expanded = true;
+              }
+            }
+            
+            const nextLine = matchLine + distance;
+            if (data.linesMap.has(nextLine) && !includedLines.has(nextLine)) {
+              const text = data.linesMap.get(nextLine)!;
+              const len = Buffer.byteLength(text, "utf8");
+              if (currentBytes + len <= args.maxBytesPerFile) {
+                includedLines.add(nextLine);
+                currentBytes += len;
+                expanded = true;
+              }
+            }
+          }
+          distance++;
+        }
+      }
+
+      const omittedLineRanges: Array<[number, number]> = [];
+      let omitStart = -1;
+      let omitPrev = -1;
+      for (const line of allLineNumbers) {
+        if (!includedLines.has(line)) {
+          if (omitStart === -1) {
+            omitStart = line;
+            omitPrev = line;
+          } else if (line === omitPrev + 1) {
+            omitPrev = line;
+          } else {
+            omittedLineRanges.push([omitStart, omitPrev]);
+            omitStart = line;
+            omitPrev = line;
+          }
+        } else {
+          if (omitStart !== -1) {
+            omittedLineRanges.push([omitStart, omitPrev]);
+            omitStart = -1;
+            omitPrev = -1;
+          }
+        }
+      }
+      if (omitStart !== -1) {
+        omittedLineRanges.push([omitStart, omitPrev]);
+      }
+
+      const finalLineNumbers = allLineNumbers.filter(l => includedLines.has(l));
+      if (finalLineNumbers.length === 0) continue;
 
       let content = "";
       const lineRanges: Array<[number, number]> = [];
-      let currentRangeStart = lineNumbers[0];
-      let previousLine = lineNumbers[0];
+      let currentRangeStart = finalLineNumbers[0];
+      let previousLine = finalLineNumbers[0];
 
-      content += data.linesMap.get(lineNumbers[0])!;
+      content += data.linesMap.get(finalLineNumbers[0])!;
 
-      for (let i = 1; i < lineNumbers.length; i++) {
-        const currentLine = lineNumbers[i];
+      for (let i = 1; i < finalLineNumbers.length; i++) {
+        const currentLine = finalLineNumbers[i];
         if (currentLine === previousLine + 1) {
           content += data.linesMap.get(currentLine)!;
         } else {
@@ -102,6 +187,7 @@ export class SearchEngine {
         file,
         content,
         lineRanges,
+        ...(omittedLineRanges.length > 0 ? { omittedLineRanges } : {}),
       });
     }
 
