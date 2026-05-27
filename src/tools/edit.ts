@@ -3,9 +3,12 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeEditToolSpec: ToolSpec = {
   name: "ParecodeEdit",
   description:
-    "Edit files by providing an array of replacements. " +
-    "Each replacement specifies the target file, the exact string to replace, and the new string. " +
-    "Optionally, you can enable fuzzy matching for whitespace-tolerant matching.",
+    "Safely edit files by providing an array of replacements. " +
+    "This tool performs atomic writes and uses mtime-based concurrency control to prevent conflicts. " +
+    "Each edit requires the target file, the exact old string to replace, and the new string. " +
+    "Edits across different files run in parallel, while multiple edits to the same file are serialized. " +
+    "If exact matching fails, you can enable fuzzy matching (`true` for whitespace tolerance, or `'aggressive'` for Unicode normalization). " +
+    "Fuzzy matching fails closed if the match confidence is below 0.85.",
   inputSchema: {
     type: "object",
     properties: {
