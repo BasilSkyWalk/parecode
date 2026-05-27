@@ -1,6 +1,8 @@
 import { McpAdapter } from "../adapters/mcp.js";
 import { SearchEngine, SearchArgs } from "../engine/search.js";
 import { ParecodeSearchToolSpec } from "../tools/search.js";
+import { EditEngine, EditRequest } from "../engine/edit.js";
+import { ParecodeEditToolSpec } from "../tools/edit.js";
 
 async function main() {
   const adapter = new McpAdapter();
@@ -11,6 +13,15 @@ async function main() {
     async (args: unknown) => {
       const searchArgs = args as SearchArgs;
       return await searchEngine.search(searchArgs);
+    }
+  );
+
+  const editEngine = new EditEngine(adapter);
+  adapter.registerTool(
+    ParecodeEditToolSpec,
+    async (args: unknown) => {
+      const editArgs = args as EditRequest;
+      return await editEngine.edit(editArgs);
     }
   );
 
