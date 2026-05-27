@@ -23,12 +23,16 @@ export const ParecodeSearchToolSpec: ToolSpec = {
       },
       contextLines: { 
         type: "number", 
-        description: "Number of context lines to include (unused in M0)" 
+        description: "Number of context lines to include around matches. Defaults to 2." 
+      },
+      maxBytesPerFile: {
+        type: "number",
+        description: "Maximum bytes to return per file before chunking/truncating the output."
       },
       truncate: { 
         type: "string", 
         enum: ["none", "signatures", "full"], 
-        description: "Truncation mode. Use 'signatures' to strip function bodies and save tokens." 
+        description: "Truncation mode (v0 legacy). Use 'signatures' to strip function bodies and save tokens." 
       }
     },
     required: ["pattern"]

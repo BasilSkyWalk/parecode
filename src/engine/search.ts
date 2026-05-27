@@ -4,7 +4,8 @@ import { ASTProcessor } from "./ast.js";
 export interface SearchArgs {
   pattern: string;
   paths?: string[];
-  contextLines?: number;
+  contextLines?: number; // default 2
+  maxBytesPerFile?: number;
   truncate?: "none" | "signatures" | "full";
 }
 
