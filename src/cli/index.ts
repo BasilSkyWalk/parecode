@@ -7,6 +7,7 @@ import { ParecodeEditToolSpec } from "../tools/edit.js";
 import { initCommand } from "./init.js";
 import { statsCommand } from "./stats.js";
 import { pruneCommand } from "./prune.js";
+import { doctorCommand } from "./doctor.js";
 
 async function serve() {
   const adapter = new McpAdapter();
@@ -57,6 +58,9 @@ async function main() {
       break;
     case "prune":
       await pruneCommand(args.slice(1));
+      break;
+    case "doctor":
+      await doctorCommand();
       break;
     default:
       process.stderr.write(`Unknown command: ${cmd}\n`);
