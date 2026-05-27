@@ -40,29 +40,56 @@ export function findFuzzyMatch(
   search: string,
   aggressive: boolean = false
 ): FuzzyMatchResult | null {
-  const normalizeWhitespace = (str: string) => str.replace(/\s+/g, "");
-  
-  const normalizedSearch = normalizeWhitespace(search);
+  const getNormalized = (str: string, isAggressive: boolean) => {
+    const map: number[] = [];
+    let normStr = "";
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i];
+      if (/\s/.test(char)) continue;
+      if (isAggressive && /[\u0300-\u036f]/.test(char)) continue;
+
+      let norm = char;
+      if (isAggressive) {
+        norm = char.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+      }
+      
+      for (let j = 0; j < norm.length; j++) {
+        normStr += norm[j];
+        map.push(i);
+      }
+    }
+    return { normStr, map };
+  };
+
+  const { normStr: normalizedSearch } = getNormalized(search, aggressive);
   if (normalizedSearch.length === 0) {
     return null;
   }
 
-  const normalizedContent = normalizeWhitespace(content);
-  
-  const indexMap: number[] = [];
-  for (let i = 0; i < content.length; i++) {
-    if (!/\s/.test(content[i])) {
-      indexMap.push(i);
-    }
-  }
+  const { normStr: normalizedContent, map: indexMap } = getNormalized(content, aggressive);
 
   let bestMatch: FuzzyMatchResult | null = null;
   let highestConfidence = 0;
 
+  const getEndIndex = (lastMatchedIndex: number) => {
+    let endOriginalIndex = indexMap[lastMatchedIndex] + 1;
+    while (endOriginalIndex < content.length) {
+      const nextChar = content[endOriginalIndex];
+      if (aggressive && /[\u0300-\u036f]/.test(nextChar)) {
+        endOriginalIndex++;
+      } else if (/[\uDC00-\uDFFF]/.test(nextChar)) {
+        endOriginalIndex++;
+      } else {
+        break;
+      }
+    }
+    return endOriginalIndex;
+  };
+
   const exactIndex = normalizedContent.indexOf(normalizedSearch);
   if (exactIndex !== -1) {
     const startOriginalIndex = indexMap[exactIndex];
-    const endOriginalIndex = indexMap[exactIndex + normalizedSearch.length - 1] + 1;
+    const endOriginalIndex = getEndIndex(exactIndex + normalizedSearch.length - 1);
     return {
       matchedText: content.substring(startOriginalIndex, endOriginalIndex),
       startIndex: startOriginalIndex,
@@ -86,7 +113,7 @@ export function findFuzzyMatch(
       if (confidence > highestConfidence) {
         highestConfidence = confidence;
         const startOriginalIndex = indexMap[i];
-        const endOriginalIndex = indexMap[i + size - 1] + 1;
+        const endOriginalIndex = getEndIndex(i + size - 1);
         bestMatch = {
           matchedText: content.substring(startOriginalIndex, endOriginalIndex),
           startIndex: startOriginalIndex,

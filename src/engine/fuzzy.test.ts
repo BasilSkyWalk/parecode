@@ -38,6 +38,19 @@ describe("Fuzzy Match", () => {
     expect(result).toBeNull();
   });
 
+  it("should match with aggressive unicode normalization if enabled", () => {
+    const content = "const re\u0301sume\u0301 = 1;";
+    const search = "const résumé = 1;";
+    
+    const resultNormal = findFuzzyMatch(content, search, false);
+    expect(resultNormal).toBeNull();
+    
+    const resultAggressive = findFuzzyMatch(content, search, true);
+    expect(resultAggressive).not.toBeNull();
+    expect(resultAggressive?.confidence).toBe(1.0);
+    expect(resultAggressive?.matchedText).toBe("const re\u0301sume\u0301 = 1;");
+  });
+
   it("should fail gracefully on empty search", () => {
     const content = "const a = 1;";
     const result = findFuzzyMatch(content, "");
