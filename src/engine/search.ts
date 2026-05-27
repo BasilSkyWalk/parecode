@@ -1,5 +1,4 @@
 import { ToolHost } from "../adapters/base.js";
-import { resolveRipgrep, spawnCommand } from "../infra/spawn.js";
 import { ASTProcessor } from "./ast.js";
 
 export interface SearchArgs {
@@ -23,7 +22,7 @@ export class SearchEngine {
   constructor(private host: ToolHost) {}
 
   public async search(args: SearchArgs): Promise<SearchResult> {
-    const rgPath = await resolveRipgrep();
+    const rgPath = await this.host.resolveCommand("rg");
     if (!rgPath) {
       this.host.log("error", "ripgrep not found via which");
       return {
@@ -38,7 +37,7 @@ export class SearchEngine {
     const rgArgs = ["-l", args.pattern, ...paths];
     this.host.log("info", "Spawning ripgrep", { rgArgs });
 
-    const { stdout, code, stderr } = await spawnCommand(rgPath, rgArgs);
+    const { stdout, code, stderr } = await this.host.exec(rgPath, rgArgs);
 
     if (code !== 0 && stdout.trim() === "") {
       if (code === 1) {

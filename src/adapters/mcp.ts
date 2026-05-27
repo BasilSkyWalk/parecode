@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as fs from "node:fs/promises";
 import { ToolHost, ToolSpec, ToolHandler } from "./base.js";
 import { z } from "zod";
+import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 
 import { Tracker } from "../stats/tracker.js";
 
@@ -69,6 +70,14 @@ export class McpAdapter implements ToolHost {
 
   public recordStat(event: any): void {
     this.tracker.record(event).catch(() => {});
+  }
+
+  public async exec(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number | null }> {
+    return spawnCommand(cmd, args, cwd);
+  }
+
+  public async resolveCommand(cmd: string): Promise<string | null> {
+    return resolveCommand(cmd);
   }
 
   public async start(): Promise<void> {

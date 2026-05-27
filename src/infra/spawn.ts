@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
 
 /**
- * Resolves the path to the ripgrep binary using `which`.
+ * Resolves the path to a binary using `which`.
  * Returns the absolute path, or null if not found.
  */
-export async function resolveRipgrep(): Promise<string | null> {
+export async function resolveCommand(cmd: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const whichProc = spawn("which", ["rg"]);
+    const whichProc = spawn("which", [cmd]);
     let out = "";
     
     whichProc.stdout.on("data", (data) => {
