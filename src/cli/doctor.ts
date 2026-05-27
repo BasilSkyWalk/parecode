@@ -65,6 +65,7 @@ export async function doctorCommand() {
     const firstLine = rgVersionResult.stdout.trim().split(/\r?\n/)[0];
     process.stdout.write(`Ripgrep:       ${firstLine}\n`);
   } else {
-    process.stdout.write(`Ripgrep:       Not found on PATH\n`);
+    process.stdout.write(`Ripgrep:       Not found on PATH (ERROR: ripgrep is required)\n`);
+    process.exit(1);
   }
 }

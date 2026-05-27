@@ -27,7 +27,7 @@ export class SearchEngine {
       this.host.log("error", "ripgrep not found via which");
       return {
         status: "error",
-        detail: "ripgrep not found on PATH. Please install it.",
+        detail: "ripgrep not found on PATH. Please install it or run 'parecode doctor' for more information.",
       };
     }
 
