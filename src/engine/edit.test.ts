@@ -141,4 +141,62 @@ describe("EditEngine", () => {
     expect(result.results[0].status).toBe("error");
     expect(result.results[0].detail).toContain("Multiple occurrences of exact match found");
   });
+
+  it("should apply fuzzy match successfully if enabled", async () => {
+    const mockHost: ToolHost = {
+      registerTool: vi.fn(),
+      readFile: vi.fn().mockResolvedValue("const   a  = \n 1;\nconst b = 2;\n"),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+    };
+
+    const engine = new EditEngine(mockHost);
+    const result = await engine.edit({
+      edits: [
+        {
+          file: "test.ts",
+          oldString: "const a = 1;",
+          newString: "const a = 42;",
+          fuzzy: true
+        }
+      ]
+    });
+
+    expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "const a = 42;\nconst b = 2;\n");
+    expect(result.results[0].status).toBe("success");
+    expect(result.results[0].confidence).toBe(1.0);
+    expect(result.results[0].matchedText).toBe("const   a  = \n 1;");
+  });
+
+  it("should fail closed if fuzzy match confidence is too low", async () => {
+    const mockHost: ToolHost = {
+      registerTool: vi.fn(),
+      readFile: vi.fn().mockResolvedValue("const myVar = 1;\n"),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+    };
+
+    const engine = new EditEngine(mockHost);
+    const result = await engine.edit({
+      edits: [
+        {
+          file: "test.ts",
+          oldString: "const yourVar = 1;",
+          newString: "const yourVar = 42;",
+          fuzzy: true
+        }
+      ]
+    });
+
+    expect(mockHost.writeFile).not.toHaveBeenCalled();
+    expect(result.results[0].status).toBe("fuzzy_match_failed");
+  });
 });
