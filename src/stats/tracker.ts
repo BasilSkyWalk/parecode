@@ -93,6 +93,7 @@ export class Tracker {
       } catch {
       }
 
+      rollup = rollup.filter((r) => r.sessionId !== this.sessionId);
       rollup.push({
         sessionId: this.sessionId,
         startTime: this.startTime,
