@@ -1,5 +1,4 @@
 import { ToolHost } from "../adapters/base.js";
-import { ASTProcessor } from "./ast.js";
 
 export interface SearchArgs {
   pattern: string;
@@ -15,7 +14,7 @@ export interface SearchResult {
   matches?: Array<{
     file: string;
     content: string;
-    degraded?: boolean;
+    lineRanges: Array<[number, number]>;
   }>;
 }
 
@@ -32,10 +31,10 @@ export class SearchEngine {
       };
     }
 
-    const truncate = args.truncate || "none";
+    const ctx = args.contextLines ?? 2;
     const paths = args.paths && args.paths.length > 0 ? args.paths : ["."];
 
-    const rgArgs = ["-l", args.pattern, ...paths];
+    const rgArgs = ["--json", "-C", ctx.toString(), args.pattern, ...paths];
     this.host.log("info", "Spawning ripgrep", { rgArgs });
 
     const { stdout, code, stderr } = await this.host.exec(rgPath, rgArgs);
@@ -48,48 +47,75 @@ export class SearchEngine {
       return { status: "error", detail: `ripgrep exited with code ${code}` };
     }
 
-    const files = stdout.trim().split("\n").filter(Boolean);
-    const ast = new ASTProcessor();
+    const lines = stdout.split("\n").filter(Boolean);
+    const fileMatches = new Map<string, { linesMap: Map<number, string> }>();
 
-    let estimatedNativeTokens = 0;
-    let actualTokens = 0;
-
-    const matches = await Promise.all(
-      files.map(async (file) => {
-        try {
-          const content = await this.host.readFile(file);
-          const result = ast.process(content, { truncate });
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.type === "match" || parsed.type === "context") {
+          const file = parsed.data.path.text;
+          const lineNum = parsed.data.line_number;
+          const text = parsed.data.lines.text;
           
-          estimatedNativeTokens += Math.ceil(content.length / 4);
-          actualTokens += Math.ceil(result.content.length / 4);
-          
-          return {
-            file,
-            content: result.content,
-            degraded: result.degraded,
-          };
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          this.host.log("warn", `Failed to read matched file: ${file}`, { error: errMsg });
-          return null;
+          if (!fileMatches.has(file)) {
+            fileMatches.set(file, { linesMap: new Map() });
+          }
+          fileMatches.get(file)!.linesMap.set(lineNum, text);
         }
-      })
-    );
+      } catch (err) {
+        // ignore parse errors
+      }
+    }
 
-    const finalMatches = matches.filter((m): m is NonNullable<typeof m> => m !== null);
+    let actualTokens = 0;
+    const matches: NonNullable<SearchResult["matches"]> = [];
+
+    for (const [file, data] of fileMatches.entries()) {
+      const lineNumbers = Array.from(data.linesMap.keys()).sort((a, b) => a - b);
+      if (lineNumbers.length === 0) continue;
+
+      let content = "";
+      const lineRanges: Array<[number, number]> = [];
+      let currentRangeStart = lineNumbers[0];
+      let previousLine = lineNumbers[0];
+
+      content += data.linesMap.get(lineNumbers[0])!;
+
+      for (let i = 1; i < lineNumbers.length; i++) {
+        const currentLine = lineNumbers[i];
+        if (currentLine === previousLine + 1) {
+          content += data.linesMap.get(currentLine)!;
+        } else {
+          lineRanges.push([currentRangeStart, previousLine]);
+          content += "\n---\n\n";
+          content += data.linesMap.get(currentLine)!;
+          currentRangeStart = currentLine;
+        }
+        previousLine = currentLine;
+      }
+      lineRanges.push([currentRangeStart, previousLine]);
+
+      actualTokens += Math.ceil(content.length / 4);
+
+      matches.push({
+        file,
+        content,
+        lineRanges,
+      });
+    }
 
     this.host.recordStat({
       toolCall: "ParecodeSearch",
       pattern: args.pattern,
-      truncate,
-      filesMatched: finalMatches.length,
-      estimatedNativeTokens,
+      truncate: "v1-text",
+      filesMatched: matches.length,
       actualTokens,
     });
 
     return {
       status: "success",
-      matches: finalMatches,
+      matches,
     };
   }
 }
