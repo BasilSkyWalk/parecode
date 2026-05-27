@@ -14,4 +14,5 @@ export interface ToolHost {
   registerTool(spec: ToolSpec, handler: ToolHandler): void;
   readFile(path: string): Promise<string>;
   log(level: "info" | "warn" | "error", msg: string, meta?: object): void;
+  recordStat(event: any): void;
 }

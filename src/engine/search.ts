@@ -53,12 +53,19 @@ export class SearchEngine {
     const files = stdout.trim().split("\n").filter(Boolean);
     const ast = new ASTProcessor();
 
+    let estimatedNativeTokens = 0;
+    let actualTokens = 0;
+
     // Parallel file reads
     const matches = await Promise.all(
       files.map(async (file) => {
         try {
           const content = await this.host.readFile(file);
           const result = ast.process(content, { truncate });
+          
+          estimatedNativeTokens += Math.ceil(content.length / 4);
+          actualTokens += Math.ceil(result.content.length / 4);
+          
           return {
             file,
             content: result.content,
@@ -72,9 +79,20 @@ export class SearchEngine {
       })
     );
 
+    const finalMatches = matches.filter((m): m is NonNullable<typeof m> => m !== null);
+
+    this.host.recordStat({
+      toolCall: "ParecodeSearch",
+      pattern: args.pattern,
+      truncate,
+      filesMatched: finalMatches.length,
+      estimatedNativeTokens,
+      actualTokens,
+    });
+
     return {
       status: "success",
-      matches: matches.filter((m): m is NonNullable<typeof m> => m !== null),
+      matches: finalMatches,
     };
   }
 }

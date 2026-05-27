@@ -4,10 +4,14 @@ import * as fs from "node:fs/promises";
 import { ToolHost, ToolSpec, ToolHandler } from "./base.js";
 import { z } from "zod";
 
+import { Tracker } from "../stats/tracker.js";
+
 export class McpAdapter implements ToolHost {
   private server: McpServer;
+  private tracker: Tracker;
 
   constructor() {
+    this.tracker = new Tracker();
     this.server = new McpServer(
       {
         name: "parecode",
@@ -61,6 +65,11 @@ export class McpAdapter implements ToolHost {
       meta,
     });
     process.stderr.write(logLine + "\n");
+  }
+
+  public recordStat(event: any): void {
+    // Fire and forget, don't wait for write
+    this.tracker.record(event).catch(() => {});
   }
 
   public async start(): Promise<void> {
