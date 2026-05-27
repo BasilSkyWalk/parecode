@@ -1,0 +1,38 @@
+{
+  "name": "parecode",
+  "version": "0.0.0",
+  "description": "MCP server for AST-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "ast",
+    "tree-sitter",
+    "ripgrep",
+    "code-search",
+    "code-edit",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BasilSkyWalk/parecode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BasilSkyWalk/parecode/issues"
+  },
+  "homepage": "https://github.com/BasilSkyWalk/parecode#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
