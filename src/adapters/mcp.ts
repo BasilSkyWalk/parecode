@@ -54,8 +54,30 @@ export class McpAdapter implements ToolHost {
     return await fs.readFile(path, "utf-8");
   }
 
-  public async writeFile(path: string, content: string): Promise<void> {
-    await fs.writeFile(path, content, "utf-8");
+  public async writeFile(filepath: string, content: string): Promise<void> {
+    const crypto = await import("node:crypto");
+    const path = await import("node:path");
+    const tmpPath = `${filepath}.${process.pid}-${crypto.randomUUID()}.parecodetmp`;
+    let fh;
+    try {
+      fh = await fs.open(tmpPath, "w");
+      await fh.writeFile(content, "utf-8");
+      await fh.sync();
+    } finally {
+      if (fh) {
+        await fh.close();
+      }
+    }
+    await fs.rename(tmpPath, filepath);
+
+    const dir = path.dirname(filepath);
+    fs.readdir(dir).then((files) => {
+      for (const f of files) {
+        if (f.endsWith(".parecodetmp") && !f.includes(`.${process.pid}-`)) {
+          fs.unlink(path.join(dir, f)).catch(() => {});
+        }
+      }
+    }).catch(() => {});
   }
 
   public async statFile(path: string): Promise<{ mtimeMs: number; size: number }> {
