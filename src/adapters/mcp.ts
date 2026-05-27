@@ -26,6 +26,14 @@ export class McpAdapter implements ToolHost {
     );
   }
 
+  public async initTracker(): Promise<void> {
+    await this.tracker.init();
+  }
+
+  public async finalizeTracker(): Promise<void> {
+    await this.tracker.finalize();
+  }
+
   public registerTool(spec: ToolSpec, handler: ToolHandler): void {
     this.server.tool(
       spec.name,

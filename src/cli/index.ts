@@ -1,13 +1,15 @@
+#!/usr/bin/env node
 import { McpAdapter } from "../adapters/mcp.js";
 import { SearchEngine, SearchArgs } from "../engine/search.js";
 import { ParecodeSearchToolSpec } from "../tools/search.js";
 import { EditEngine, EditRequest } from "../engine/edit.js";
 import { ParecodeEditToolSpec } from "../tools/edit.js";
 
-async function main() {
+async function serve() {
   const adapter = new McpAdapter();
+  await adapter.initTracker();
+
   const searchEngine = new SearchEngine(adapter);
-  
   adapter.registerTool(
     ParecodeSearchToolSpec,
     async (args: unknown) => {
@@ -26,9 +28,31 @@ async function main() {
   );
 
   await adapter.start();
+
+  const shutdown = async () => {
+    await adapter.finalizeTracker();
+    process.exit(0);
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const cmd = args[0] || "serve";
+
+  switch (cmd) {
+    case "serve":
+      await serve();
+      break;
+    default:
+      process.stderr.write(`Unknown command: ${cmd}\n`);
+      process.exit(1);
+  }
 }
 
 main().catch((err) => {
-  console.error(err);
+  process.stderr.write(`Fatal error: ${err}\n`);
   process.exit(1);
 });
