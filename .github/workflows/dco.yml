@@ -1,0 +1,51 @@
+name: DCO
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dco-check:
+    name: DCO sign-off check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commits for Signed-off-by
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner, repo, pull_number, per_page: 100,
+            });
+
+            const signoffRe = /^Signed-off-by: .+ <.+@.+>$/m;
+            const merges = [];
+            const unsigned = [];
+
+            for (const c of commits) {
+              if (c.parents && c.parents.length > 1) {
+                merges.push(c.sha);
+                continue;
+              }
+              if (!signoffRe.test(c.commit.message)) {
+                unsigned.push({ sha: c.sha, message: c.commit.message.split('\n')[0] });
+              }
+            }
+
+            if (unsigned.length === 0) {
+              core.info(`All ${commits.length - merges.length} non-merge commit(s) carry a DCO sign-off.`);
+              return;
+            }
+
+            const lines = unsigned.map(u => `  - ${u.sha.slice(0, 7)} ${u.message}`).join('\n');
+            core.setFailed(
+              `Missing DCO sign-off on ${unsigned.length} commit(s):\n${lines}\n\n` +
+              `Add a sign-off by amending each commit with \`git commit --amend -s\` ` +
+              `(or rebasing with \`git rebase HEAD~N --signoff\`) and force-pushing. ` +
+              `See CONTRIBUTING.md for the full Developer Certificate of Origin.`
+            );

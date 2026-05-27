@@ -54,7 +54,7 @@ CI runs `{macOS, Linux, Windows} × Node {20, 22}`. A PR that's green locally on
 ## Commits and PRs
 
 - Branches: `feat|fix|chore|docs/<short>`.
-- **DCO sign-off required** — commit with `git commit -s`. PRs without sign-off are blocked.
+- **DCO sign-off required** — commit with `git commit -s`. The `DCO` workflow blocks PRs whose non-merge commits are missing a `Signed-off-by:` trailer. See [Developer Certificate of Origin](#developer-certificate-of-origin) below.
 - Conventional commits encouraged (`feat:`, `fix:`, `chore:`, `docs:`).
 - Tool I/O schema changes are **breaking** — they require a major version bump and a `CHANGELOG.md` entry.
 - Tool descriptions in `tools/*.ts` are product surface. Any PR that changes their behavior should re-read them cold and include reviewer attention.
@@ -66,4 +66,49 @@ CI runs `{macOS, Linux, Windows} × Node {20, 22}`. A PR that's green locally on
 Use the issue templates. For AST grammar gaps (e.g. a language whose `signatures` mode is wrong), please attach a minimal source file that reproduces the issue.
 
 Security-sensitive reports: see `SECURITY.md` (TBD) or email the maintainers listed in `MAINTAINERS.md`. Please don't open a public issue for vulnerabilities.
+
+---
+
+## Developer Certificate of Origin
+
+Parecode uses the [Developer Certificate of Origin 1.1](https://developercertificate.org/) to track contributor provenance. Every non-merge commit on a PR must carry a `Signed-off-by:` trailer matching the commit author. `git commit -s` adds it; `git rebase HEAD~N --signoff` retroactively signs the last N commits.
+
+By adding a sign-off you certify the following:
+
+```
+Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+```
 
