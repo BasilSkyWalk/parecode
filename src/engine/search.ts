@@ -3,9 +3,8 @@ import { ToolHost } from "../adapters/base.js";
 export interface SearchArgs {
   pattern: string;
   paths?: string[];
-  contextLines?: number; // default 2
+  contextLines?: number;
   maxBytesPerFile?: number;
-  truncate?: "none" | "signatures" | "full";
 }
 
 export interface SearchResult {
@@ -68,7 +67,6 @@ export class SearchEngine {
           }
         }
       } catch (err) {
-        // ignore parse errors
       }
     }
 

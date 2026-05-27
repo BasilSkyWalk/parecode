@@ -3,11 +3,11 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeSearchToolSpec: ToolSpec = {
   name: "ParecodeSearch",
   description: 
-    "Search across the codebase using ripgrep with optional AST-aware truncation. " +
-    "Use this tool to explore code quickly without consuming excessive context tokens. " +
-    "CRITICAL: When exploring structure, APIs, or classes, ALWAYS set `truncate: 'signatures'` " +
-    "to return only function and method signatures (stripping bodies). " +
-    "If you need full implementations for a specific file, set `truncate: 'none'` (or omit). " +
+    "Search across the codebase using ripgrep. " +
+    "Use this tool to find code quickly without consuming excessive context tokens. " +
+    "Returns structured matches with a window of context lines around each match. " +
+    "If a file has too many matches, the result is automatically chunked to stay within maxBytesPerFile, " +
+    "and omitted lines are listed as omittedLineRanges. " +
     "The search supports regex patterns and optionally restricts to specific paths.",
   inputSchema: {
     type: "object",
@@ -28,11 +28,6 @@ export const ParecodeSearchToolSpec: ToolSpec = {
       maxBytesPerFile: {
         type: "number",
         description: "Maximum bytes to return per file before chunking/truncating the output."
-      },
-      truncate: { 
-        type: "string", 
-        enum: ["none", "signatures", "full"], 
-        description: "Truncation mode (v0 legacy). Use 'signatures' to strip function bodies and save tokens." 
       }
     },
     required: ["pattern"]

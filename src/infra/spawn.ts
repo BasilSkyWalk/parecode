@@ -1,12 +1,11 @@
 import { spawn } from "node:child_process";
+import * as os from "node:os";
 
-/**
- * Resolves the path to a binary using `which`.
- * Returns the absolute path, or null if not found.
- */
 export async function resolveCommand(cmd: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const whichProc = spawn("which", [cmd]);
+    const isWin = os.platform() === "win32";
+    const resolverCmd = isWin ? "where" : "which";
+    const whichProc = spawn(resolverCmd, [cmd]);
     let out = "";
     
     whichProc.stdout.on("data", (data) => {
@@ -15,7 +14,8 @@ export async function resolveCommand(cmd: string): Promise<string | null> {
 
     whichProc.on("close", (code) => {
       if (code === 0 && out.trim().length > 0) {
-        resolve(out.trim());
+        const firstPath = out.trim().split(/\r?\n/)[0];
+        resolve(firstPath);
       } else {
         resolve(null);
       }
@@ -27,18 +27,12 @@ export async function resolveCommand(cmd: string): Promise<string | null> {
   });
 }
 
-/**
- * Result from running a command.
- */
 export interface SpawnResult {
   stdout: string;
   stderr: string;
   code: number | null;
 }
 
-/**
- * Runs a command with the given arguments, avoiding the shell.
- */
 export async function spawnCommand(
   cmd: string,
   args: string[],
