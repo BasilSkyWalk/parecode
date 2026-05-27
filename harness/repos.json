@@ -1,0 +1,30 @@
+[
+  {
+    "name": "express",
+    "url": "https://github.com/expressjs/express.git",
+    "type": "backend",
+    "language": "javascript",
+    "description": "A small/medium legacy backend codebase in JS."
+  },
+  {
+    "name": "nest",
+    "url": "https://github.com/nestjs/nest.git",
+    "type": "monorepo",
+    "language": "typescript",
+    "description": "A large, heavily architected TS monorepo backend framework."
+  },
+  {
+    "name": "zod",
+    "url": "https://github.com/colinhacks/zod.git",
+    "type": "library",
+    "language": "typescript",
+    "description": "A dense, type-heavy TypeScript library."
+  },
+  {
+    "name": "zustand",
+    "url": "https://github.com/pmndrs/zustand.git",
+    "type": "frontend-library",
+    "language": "typescript",
+    "description": "A popular frontend state management library with modern TS patterns."
+  }
+]
