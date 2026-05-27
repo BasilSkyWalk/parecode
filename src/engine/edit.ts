@@ -74,7 +74,13 @@ export class EditEngine {
         }
 
         if (fileStatus === "success") {
-          await this.host.writeFile(file, content);
+          const reStats = await this.host.statFile(file);
+          if (reStats.mtimeMs !== stats.mtimeMs) {
+            fileStatus = "conflict";
+            fileDetail = "File modified by another process during edit";
+          } else {
+            await this.host.writeFile(file, content);
+          }
         }
 
         const res: EditResult = {

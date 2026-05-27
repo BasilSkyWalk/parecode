@@ -284,4 +284,37 @@ describe("EditEngine", () => {
     expect(mockHost.writeFile).toHaveBeenCalledTimes(1);
     expect(mockHost.writeFile).toHaveBeenCalledWith("test2.ts", "let c = 30;\n");
   });
+
+  it("should return conflict if file is modified between read and write", async () => {
+    const statMock = vi.fn()
+      .mockResolvedValueOnce({ mtimeMs: 100, size: 456 })
+      .mockResolvedValueOnce({ mtimeMs: 200, size: 456 });
+
+    const mockHost: ToolHost = {
+      registerTool: vi.fn(),
+      readFile: vi.fn().mockResolvedValue("let a = 1;"),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      statFile: statMock,
+    };
+
+    const engine = new EditEngine(mockHost);
+    const result = await engine.edit({
+      edits: [
+        {
+          file: "test.ts",
+          oldString: "let a = 1;",
+          newString: "let a = 10;"
+        }
+      ]
+    });
+
+    expect(mockHost.writeFile).not.toHaveBeenCalled();
+    expect(result.results.length).toBe(1);
+    expect(result.results[0].status).toBe("conflict");
+    expect(result.results[0].detail).toBe("File modified by another process during edit");
+  });
 });
