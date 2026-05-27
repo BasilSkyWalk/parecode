@@ -199,4 +199,89 @@ describe("EditEngine", () => {
     expect(mockHost.writeFile).not.toHaveBeenCalled();
     expect(result.results[0].status).toBe("fuzzy_match_failed");
   });
+
+  it("should process multiple edits in the same file sequentially and write once", async () => {
+    const mockHost: ToolHost = {
+      registerTool: vi.fn(),
+      readFile: vi.fn().mockResolvedValue("let a = 1;\nlet b = 2;\n"),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+    };
+
+    const engine = new EditEngine(mockHost);
+    const result = await engine.edit({
+      edits: [
+        {
+          file: "test.ts",
+          oldString: "let a = 1;",
+          newString: "let a = 10;"
+        },
+        {
+          file: "test.ts",
+          oldString: "let b = 2;",
+          newString: "let b = 20;"
+        }
+      ]
+    });
+
+    expect(mockHost.readFile).toHaveBeenCalledTimes(1);
+    expect(mockHost.writeFile).toHaveBeenCalledTimes(1);
+    expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "let a = 10;\nlet b = 20;\n");
+    expect(result.results.length).toBe(1);
+    expect(result.results[0].status).toBe("success");
+    expect(result.results[0].file).toBe("test.ts");
+  });
+
+  it("should fail the entire file if one edit fails but process other files successfully", async () => {
+    const mockHost: ToolHost = {
+      registerTool: vi.fn(),
+      readFile: vi.fn().mockImplementation(async (file: string) => {
+        if (file === "test1.ts") return "let a = 1;\nlet b = 2;\n";
+        if (file === "test2.ts") return "let c = 3;\n";
+        return "";
+      }),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+    };
+
+    const engine = new EditEngine(mockHost);
+    const result = await engine.edit({
+      edits: [
+        {
+          file: "test1.ts",
+          oldString: "let a = 1;",
+          newString: "let a = 10;"
+        },
+        {
+          file: "test1.ts",
+          oldString: "let z = 99;",
+          newString: "let z = 100;"
+        },
+        {
+          file: "test2.ts",
+          oldString: "let c = 3;",
+          newString: "let c = 30;"
+        }
+      ]
+    });
+
+    expect(result.results.length).toBe(2);
+    
+    const res1 = result.results.find(r => r.file === "test1.ts");
+    expect(res1?.status).toBe("error");
+    
+    const res2 = result.results.find(r => r.file === "test2.ts");
+    expect(res2?.status).toBe("success");
+    
+    expect(mockHost.writeFile).toHaveBeenCalledTimes(1);
+    expect(mockHost.writeFile).toHaveBeenCalledWith("test2.ts", "let c = 30;\n");
+  });
 });
