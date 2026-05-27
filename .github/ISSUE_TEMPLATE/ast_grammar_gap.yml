@@ -1,0 +1,62 @@
+name: AST grammar gap
+description: ASTProcessor mis-parsed, degraded, or dropped meaningful code for a supported language.
+labels: ["ast", "bug"]
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - TypeScript
+        - TSX
+        - JavaScript
+        - JSX
+        - Python
+        - Go
+        - Other (note in summary)
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Truncate mode
+      options:
+        - signatures
+        - full
+        - none
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal source snippet
+      description: Smallest input that reproduces the issue.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual AST output
+      description: What Parecode returned (paste raw output, including `degraded` flag if set).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected output
+      description: What signatures or shape you expected to see preserved.
+    validations:
+      required: true
+  - type: input
+    id: parser-version
+    attributes:
+      label: tree-sitter grammar version (if known)
+      description: From `parecode doctor`.
+  - type: input
+    id: parecode-version
+    attributes:
+      label: Parecode version
+    validations:
+      required: true
