@@ -35,14 +35,12 @@ export class SearchEngine {
     const truncate = args.truncate || "none";
     const paths = args.paths && args.paths.length > 0 ? args.paths : ["."];
 
-    // Use `rg -l` to get matching files for prototype
     const rgArgs = ["-l", args.pattern, ...paths];
     this.host.log("info", "Spawning ripgrep", { rgArgs });
 
     const { stdout, code, stderr } = await spawnCommand(rgPath, rgArgs);
 
     if (code !== 0 && stdout.trim() === "") {
-      // ripgrep returns 1 when no matches are found
       if (code === 1) {
         return { status: "success", matches: [] };
       }
@@ -56,7 +54,6 @@ export class SearchEngine {
     let estimatedNativeTokens = 0;
     let actualTokens = 0;
 
-    // Parallel file reads
     const matches = await Promise.all(
       files.map(async (file) => {
         try {

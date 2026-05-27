@@ -68,7 +68,6 @@ export class McpAdapter implements ToolHost {
   }
 
   public recordStat(event: any): void {
-    // Fire and forget, don't wait for write
     this.tracker.record(event).catch(() => {});
   }
 

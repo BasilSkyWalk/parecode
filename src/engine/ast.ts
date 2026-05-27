@@ -3,7 +3,7 @@ import ts from "tree-sitter-typescript";
 
 export interface ASTProcessorOptions {
   truncate: "none" | "signatures" | "full";
-  language?: "typescript"; // Hardcoded TS-only for prototype
+  language?: "typescript";
 }
 
 export interface ASTProcessorResult {
@@ -41,7 +41,6 @@ export class ASTProcessor {
 
         const matches = this.signaturesQuery.matches(tree.rootNode);
         
-        // Collect all captures to replace
         const captures = [];
         for (const match of matches) {
           for (const capture of match.captures) {
@@ -49,7 +48,6 @@ export class ASTProcessor {
           }
         }
 
-        // Sort by startIndex descending to replace from bottom to top
         captures.sort((a, b) => b.node.startIndex - a.node.startIndex);
 
         let result = content;
@@ -65,7 +63,6 @@ export class ASTProcessor {
       }
     }
 
-    // fallback for 'full' or unhandled
     return { content };
   }
 }
