@@ -49,6 +49,13 @@ export class McpAdapter implements ToolHost {
           };
         } catch (error) {
           const err = error as Error;
+          this.recordStat({
+            toolCall: spec.name,
+            estimatedNativeTokens: 0,
+            actualTokens: 0,
+            callsBatched: 0,
+            error: err.message,
+          });
           return {
             content: [{ type: "text", text: `Error: ${err.message}` }],
             isError: true,

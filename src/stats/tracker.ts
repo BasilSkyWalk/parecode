@@ -9,6 +9,7 @@ export interface ToolCallRecord {
   estimatedNativeTokens: number;
   actualTokens: number;
   callsBatched: number;
+  error?: string;
 }
 
 export interface SessionRecord extends ToolCallRecord {
@@ -37,6 +38,7 @@ export class Tracker {
   private totalCalls: number = 0;
   private totalCallsBatched: number = 0;
   private totalEstimatedTokensSaved: number = 0;
+  private logErrorEmitted: boolean = false;
 
   constructor() {
     this.sessionId = crypto.randomUUID();
@@ -75,7 +77,10 @@ export class Tracker {
       try {
         await fs.appendFile(this.logFile, line, "utf-8");
       } catch (err) {
-        process.stderr.write(`parecode tracker write failed: ${err}\n`);
+        if (!this.logErrorEmitted) {
+          process.stderr.write(`parecode tracker write failed: ${err}\n`);
+          this.logErrorEmitted = true;
+        }
       }
     });
 
