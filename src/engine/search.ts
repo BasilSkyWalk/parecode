@@ -15,6 +15,7 @@ export interface SearchResult {
   matches?: Array<{
     file: string;
     content: string;
+    degraded?: boolean;
   }>;
 }
 
@@ -57,10 +58,11 @@ export class SearchEngine {
       files.map(async (file) => {
         try {
           const content = await this.host.readFile(file);
-          const processedContent = ast.process(content, { truncate });
+          const result = ast.process(content, { truncate });
           return {
             file,
-            content: processedContent,
+            content: result.content,
+            degraded: result.degraded,
           };
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
