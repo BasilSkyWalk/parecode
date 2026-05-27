@@ -27,6 +27,30 @@ export class EditEngine {
       try {
         const stats = await this.host.statFile(edit.file);
         
+        let content = await this.host.readFile(edit.file);
+        
+        const count = content.split(edit.oldString).length - 1;
+        if (count === 0) {
+          results.push({
+            file: edit.file,
+            status: "error",
+            detail: "Exact match not found"
+          });
+          continue;
+        }
+        
+        if (count > 1) {
+          results.push({
+            file: edit.file,
+            status: "error",
+            detail: "Multiple occurrences of exact match found"
+          });
+          continue;
+        }
+
+        content = content.replace(edit.oldString, edit.newString);
+        await this.host.writeFile(edit.file, content);
+        
         results.push({
           file: edit.file,
           status: "success",

@@ -13,6 +13,7 @@ export type ToolHandler = (args: any) => Promise<unknown>;
 export interface ToolHost {
   registerTool(spec: ToolSpec, handler: ToolHandler): void;
   readFile(path: string): Promise<string>;
+  writeFile(path: string, content: string): Promise<void>;
   log(level: "info" | "warn" | "error", msg: string, meta?: object): void;
   recordStat(event: any): void;
   exec(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number | null }>;

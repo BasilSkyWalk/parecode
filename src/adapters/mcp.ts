@@ -54,6 +54,10 @@ export class McpAdapter implements ToolHost {
     return await fs.readFile(path, "utf-8");
   }
 
+  public async writeFile(path: string, content: string): Promise<void> {
+    await fs.writeFile(path, content, "utf-8");
+  }
+
   public async statFile(path: string): Promise<{ mtimeMs: number; size: number }> {
     const stats = await fs.stat(path);
     return {
