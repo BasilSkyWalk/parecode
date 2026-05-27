@@ -5,6 +5,9 @@ coverage/
 
 *.parecodetmp
 
+harness/repos/
+harness/session.jsonl
+
 .env
 .env.*
 !.env.example
