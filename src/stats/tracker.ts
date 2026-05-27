@@ -21,6 +21,7 @@ export interface SessionRollup {
   startTime: string;
   endTime?: string;
   totalCalls: number;
+  totalCallsBatched: number;
   totalEstimatedTokensSaved: number;
 }
 
@@ -34,6 +35,7 @@ export class Tracker {
 
   private startTime: string;
   private totalCalls: number = 0;
+  private totalCallsBatched: number = 0;
   private totalEstimatedTokensSaved: number = 0;
 
   constructor() {
@@ -57,6 +59,7 @@ export class Tracker {
 
   public async record(record: ToolCallRecord): Promise<void> {
     this.totalCalls += 1;
+    this.totalCallsBatched += record.callsBatched;
     const estimatedTokensSaved = record.estimatedNativeTokens - record.actualTokens;
     this.totalEstimatedTokensSaved += estimatedTokensSaved;
 
@@ -95,6 +98,7 @@ export class Tracker {
         startTime: this.startTime,
         endTime: new Date().toISOString(),
         totalCalls: this.totalCalls,
+        totalCallsBatched: this.totalCallsBatched,
         totalEstimatedTokensSaved: this.totalEstimatedTokensSaved,
       });
 

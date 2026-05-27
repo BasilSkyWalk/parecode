@@ -5,6 +5,7 @@ import { ParecodeSearchToolSpec } from "../tools/search.js";
 import { EditEngine, EditRequest } from "../engine/edit.js";
 import { ParecodeEditToolSpec } from "../tools/edit.js";
 import { initCommand } from "./init.js";
+import { statsCommand } from "./stats.js";
 
 async function serve() {
   const adapter = new McpAdapter();
@@ -49,6 +50,9 @@ async function main() {
       break;
     case "init":
       await initCommand(args.slice(1));
+      break;
+    case "stats":
+      await statsCommand(args.slice(1));
       break;
     default:
       process.stderr.write(`Unknown command: ${cmd}\n`);
