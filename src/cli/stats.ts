@@ -6,12 +6,15 @@ export async function statsCommand(args: string[]) {
   let sinceStr = "7d";
   let outputJson = false;
 
+  const durationPattern = /^(\d+)(d|h|m|s)$/;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--since" && i + 1 < args.length) {
       sinceStr = args[i + 1];
       i++;
     } else if (args[i] === "--json") {
       outputJson = true;
+    } else if (durationPattern.test(args[i])) {
+      sinceStr = args[i];
     }
   }
 

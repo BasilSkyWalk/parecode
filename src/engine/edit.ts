@@ -102,6 +102,29 @@ export class EditEngine {
     });
 
     const results = await Promise.all(filePromises);
+
+    let estimatedNativeTokens = 0;
+    let actualTokens = 0;
+    for (const [file, edits] of editsByFile.entries()) {
+      try {
+        const stats = await this.host.statFile(file);
+        estimatedNativeTokens += Math.ceil(stats.size / 4);
+      } catch {}
+      for (const edit of edits) {
+        actualTokens += Math.ceil((edit.oldString.length + edit.newString.length) / 4);
+      }
+    }
+    const totalEdits = request.edits.length;
+    const callsBatched = totalEdits > 0 ? totalEdits - 1 : 0;
+    this.host.recordStat({
+      toolCall: "ParecodeEdit",
+      filesEdited: editsByFile.size,
+      editsApplied: totalEdits,
+      estimatedNativeTokens,
+      actualTokens,
+      callsBatched,
+    });
+
     return { results };
   }
 }
