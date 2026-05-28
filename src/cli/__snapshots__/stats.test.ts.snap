@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`statsCommand > prints 7d stats as json 1`] = `
+"{
+  "sessions": 2,
+  "toolCalls": 15,
+  "callsBatched": 6,
+  "estimatedTokensSaved": 6000,
+  "since": "7d"
+}
+"
+`;
+
+exports[`statsCommand > prints 30d stats as text 1`] = `
+"Parecode — last 30d
+─────────────────────
+Sessions:                    3
+Tool calls:                 35
+Calls batched (est):        16
+Tokens saved (est):     16,000
+"
+`;
+
+exports[`statsCommand > prints default 7d stats as text 1`] = `
+"Parecode — last 7d
+─────────────────────
+Sessions:                    2
+Tool calls:                 15
+Calls batched (est):         6
+Tokens saved (est):      6,000
+"
+`;

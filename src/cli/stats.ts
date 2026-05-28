@@ -27,7 +27,7 @@ export async function statsCommand(args: string[]) {
   const ms = value * (unit === "d" ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000);
   const cutoff = Date.now() - ms;
 
-  const dataDir = envPaths("parecode").data;
+  const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
   const rollupFile = path.join(dataDir, "sessions", "index.json");
 
   let rollup: SessionRollup[] = [];
