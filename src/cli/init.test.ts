@@ -177,7 +177,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
     );
     expect(marketplaceCalls).toHaveLength(1);
     const sourceArg = marketplaceCalls[0][1][3] as string;
-    expect(sourceArg.startsWith("/")).toBe(true);
+    expect(path.isAbsolute(sourceArg)).toBe(true);
     expect(sourceArg).not.toContain("github.com");
   });
 

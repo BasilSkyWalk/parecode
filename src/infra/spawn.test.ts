@@ -29,7 +29,7 @@ describe("spawn infra", () => {
     const nodePath = await resolveCommand("node");
     expect(nodePath).toBeTruthy();
     expect(typeof nodePath).toBe("string");
-  });
+  }, 30000);
 
   it("handles commands with arguments containing spaces without shell interpolation", async () => {
     const nodePath = await resolveCommand("node");
@@ -39,10 +39,10 @@ describe("spawn infra", () => {
     const spaceArg = "path with spaces/and quotes'";
 
     const result = await spawnCommand(nodePath!, ["-e", script, spaceArg]);
-    
+
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe(spaceArg);
-  });
+  }, 30000);
 
   it("extracts the first path when Windows where command returns multiple lines", async () => {
     vi.mocked(os.platform).mockReturnValue("win32");

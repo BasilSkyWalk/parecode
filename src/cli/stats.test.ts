@@ -20,15 +20,13 @@ describe('statsCommand', () => {
     stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => { throw new Error('process.exit called'); }) as any);
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-28T00:00:00Z'));
-    
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-28T00:00:00Z').getTime());
+
     process.env.PARECODE_DATA_DIR = path.join(__dirname, '__fixtures__');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.useRealTimers();
     delete process.env.PARECODE_DATA_DIR;
   });
 
