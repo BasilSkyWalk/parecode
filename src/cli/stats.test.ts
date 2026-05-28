@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { statsCommand } from './stats.js';
 import * as path from 'node:path';
 
+vi.mock('../stats/retroactiveScan.js', () => ({
+  runRetroactiveScan: async () => ({
+    sessions: 5,
+    toolCalls: 42,
+    callsBatched: 20,
+    estimatedTokensSaved: 12345
+  })
+}));
+
 describe('statsCommand', () => {
   let stdoutWriteSpy: any;
   let stderrWriteSpy: any;
@@ -11,7 +20,6 @@ describe('statsCommand', () => {
     stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => { throw new Error('process.exit called'); }) as any);
-
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-28T00:00:00Z'));
     
@@ -43,5 +51,31 @@ describe('statsCommand', () => {
     await expect(statsCommand(['--since', 'invalid'])).rejects.toThrow('process.exit called');
     expect(stderrWriteSpy.mock.calls.map((c: any) => c[0]).join('')).toMatch(/Invalid --since value: invalid/);
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('prints retroactive stats as text', async () => {
+    vi.mock('../stats/retroactiveScan.js', () => ({
+      runRetroactiveScan: async () => ({
+        sessions: 5,
+        toolCalls: 42,
+        callsBatched: 20,
+        estimatedTokensSaved: 12345
+      })
+    }));
+    await statsCommand(['--retroactive']);
+    expect(stdoutWriteSpy.mock.calls.map((c: any) => c[0]).join('')).toMatchSnapshot();
+  });
+
+  it('prints retroactive stats as json', async () => {
+    vi.mock('../stats/retroactiveScan.js', () => ({
+      runRetroactiveScan: async () => ({
+        sessions: 5,
+        toolCalls: 42,
+        callsBatched: 20,
+        estimatedTokensSaved: 12345
+      })
+    }));
+    await statsCommand(['--retroactive', '--json']);
+    expect(stdoutWriteSpy.mock.calls.map((c: any) => c[0]).join('')).toMatchSnapshot();
   });
 });

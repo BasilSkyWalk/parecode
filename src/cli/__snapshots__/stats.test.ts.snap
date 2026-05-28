@@ -30,3 +30,27 @@ Calls batched (est):         6
 Tokens saved (est):      6,000
 "
 `;
+
+exports[`statsCommand > prints retroactive stats as json 1`] = `
+"{
+  "sessions": 5,
+  "toolCalls": 42,
+  "callsBatched": 20,
+  "estimatedTokensSaved": 12345,
+  "since": "30d",
+  "retroactive": true
+}
+"
+`;
+
+exports[`statsCommand > prints retroactive stats as text 1`] = `
+"Parecode — last 30d (retroactive scan)
+─────────────────────
+Sessions:                    5
+Tool calls:                 42
+Calls batched (est):        20
+Tokens saved (est):     12,345
+
+* Note: Retroactive savings are estimated, not measured.
+"
+`;
