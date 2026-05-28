@@ -1,6 +1,6 @@
 # parecode
 
-An MCP server that gives coding agents AST-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.
+An MCP server that gives coding agents context-window-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.
 
 > **Status:** pre-M0. The package name is reserved; the implementation is in active development.
 
@@ -25,7 +25,7 @@ Parecode does **not** bundle ripgrep — it shells out to the system binary so y
 npm install -g parecode
 ```
 
-Install footprint: **under 30 MB** including prebuilt `node-tree-sitter` grammars for `{darwin-arm64, darwin-x64, linux-x64, win32-x64} × Node {20, 22}`. If no prebuild matches your platform, install falls back to a source build (requires a C/C++ toolchain).
+Pure JavaScript — no native dependencies, no C/C++ toolchain required.
 
 ---
 
@@ -34,19 +34,21 @@ Install footprint: **under 30 MB** including prebuilt `node-tree-sitter` grammar
 Register the server with Claude Code:
 
 ```sh
-parecode init                 # user scope by default
-parecode init --scope project # commit MCP config to the repo
-parecode init --print         # print the command without running it
+parecode init                       # user scope by default
+parecode init --scope project       # commit MCP config to the repo
+parecode init --with-hook           # also install a SessionStart hook that nudges Claude to prefer Parecode tools
+parecode init --print               # print the equivalent command without running it
+parecode init --remove-hook         # remove the SessionStart hook
 ```
 
-Then in any session, the `ParecodeSearch` and `ParecodeEdit` tools become available.
+Then in any session, the `ParecodeSearch` and `ParecodeEdit` tools become available. Run `parecode doctor` to confirm registration and hook status.
 
 ---
 
 ## What it does
 
-- **`ParecodeSearch`** — ripgrep-backed search that can return AST signatures (names, parameters, return types, docstrings) instead of full file bodies, dramatically lowering token cost on large files.
-- **`ParecodeEdit`** — batched multi-file edits with whitespace-tolerant fuzzy matching, pre/post `stat` conflict detection, atomic same-directory rename writes, and per-language post-write syntax validation.
+- **`ParecodeSearch`** — ripgrep-backed search that returns matches with surrounding context windows in a single call, with per-file byte chunking so large result sets do not blow up your context. Omitted line ranges are reported so the agent can request a specific window without re-reading the whole file.
+- **`ParecodeEdit`** — batched multi-file edits with whitespace-tolerant fuzzy matching (and an opt-in Unicode-lookalike mode), pre/post `stat` conflict detection, and atomic same-directory rename writes. Cross-file edits run in parallel.
 - **`parecode stats`** — local JSONL session log with token-saved estimates. Zero network. Zero telemetry.
 
 ---
