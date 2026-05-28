@@ -9,6 +9,7 @@ import { statsCommand } from "./stats.js";
 import { pruneCommand } from "./prune.js";
 import { doctorCommand } from "./doctor.js";
 import { flushCommand } from "./flush.js";
+import { hookCommand } from "./hook.js";
 
 async function serve() {
   const adapter = new McpAdapter();
@@ -65,6 +66,9 @@ async function main() {
       break;
     case "flush":
       await flushCommand();
+      break;
+    case "hook":
+      await hookCommand(args.slice(1));
       break;
     default:
       process.stderr.write(`Unknown command: ${cmd}\n`);

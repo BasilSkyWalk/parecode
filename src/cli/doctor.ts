@@ -58,6 +58,22 @@ export async function doctorCommand() {
     process.stdout.write(`MCP Status:    Claude CLI not found on PATH\n`);
   }
 
+  const userSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+  let hookStatus = "Not installed";
+  try {
+    const raw = await fs.readFile(userSettingsPath, "utf-8");
+    const settings = JSON.parse(raw);
+    const entries = settings?.hooks?.SessionStart ?? [];
+    for (const entry of entries) {
+      for (const h of entry?.hooks ?? []) {
+        if (h?.type === "command" && typeof h.command === "string" && h.command.includes("parecode hook session-start")) {
+          hookStatus = "Installed (user scope)";
+        }
+      }
+    }
+  } catch {}
+  process.stdout.write(`Hook Status:   ${hookStatus}\n`);
+
   const rgCmd = os.platform() === "win32" ? "rg.exe" : "rg";
   const rgPath = await resolveCommand(rgCmd);
   if (rgPath) {
