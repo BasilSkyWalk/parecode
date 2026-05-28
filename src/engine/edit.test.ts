@@ -379,6 +379,59 @@ describe("EditEngine", () => {
     });
   });
 
+  describe("concurrency tests", () => {
+    it("should return conflict if external mtime change occurs during processing on real FS", async () => {
+      const { path: dirPath, cleanup } = await dir({ unsafeCleanup: true });
+      const filePath = path.join(dirPath, "test.txt");
+      
+      const originalContent = "let a = 1;";
+      await fs.writeFile(filePath, originalContent, "utf-8");
+      
+      const realHost: ToolHost = {
+        registerTool: vi.fn(),
+        readFile: async (p) => {
+          const originalContentRead = await fs.readFile(p, "utf-8");
+          
+          const now = new Date();
+          const futureMtimeToGuaranteeStatDifference = new Date(now.getTime() + 1000);
+          const externalEditContent = "let a = 99;";
+          await fs.writeFile(p, externalEditContent, "utf-8");
+          await fs.utimes(p, futureMtimeToGuaranteeStatDifference, futureMtimeToGuaranteeStatDifference);
+          
+          return originalContentRead;
+        },
+        writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: async (p) => {
+          const s = await fs.stat(p);
+          return { mtimeMs: s.mtimeMs, size: s.size };
+        },
+      };
+      
+      const engine = new EditEngine(realHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: filePath,
+            oldString: "let a = 1;",
+            newString: "let a = 2;"
+          }
+        ]
+      });
+      
+      expect(result.results[0].status).toBe("conflict");
+      expect(result.results[0].detail).toBe("File modified by another process during edit");
+      
+      const finalContent = await fs.readFile(filePath, "utf-8");
+      expect(finalContent).toBe("let a = 99;");
+      
+      await cleanup();
+    });
+  });
+
   describe("fuzzy snapshot tests", () => {
     it("should successfully apply edit with whitespace variants and produce consistent output", async () => {
       const mockHost: ToolHost = {

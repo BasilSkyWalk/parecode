@@ -42,7 +42,7 @@ export class EditEngine {
         for (const edit of edits) {
           const count = content.split(edit.oldString).length - 1;
           if (count === 1) {
-            content = content.replace(edit.oldString, edit.newString);
+            content = content.split(edit.oldString).join(edit.newString);
             continue;
           }
 
