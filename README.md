@@ -35,13 +35,27 @@ Register the server with Claude Code:
 parecode init                       # user scope; installs MCP + SessionStart hook (default)
 parecode init --scope project       # commit MCP config + hook to the repo
 parecode init --no-hook             # register MCP only; skip the SessionStart hook
+parecode init --with-plugin         # also install the parecode-explore Claude Code plugin
 parecode init --print               # print the equivalent command without running it
 parecode init --remove-hook         # remove the SessionStart hook (MCP stays registered)
+parecode init --remove-plugin       # uninstall the parecode-explore Claude Code plugin
 ```
 
 The SessionStart hook injects a short directive at the start of each session telling Claude to prefer `ParecodeSearch` / `ParecodeEdit` over the equivalent native tools. Without it, Claude's first-party `Grep` / `Read` / `Edit` tools typically win by default and Parecode's token savings never land. The hook payload is a static string; `parecode hook session-start` prints it. Pass `--no-hook` if you would rather opt in explicitly per session via your own tooling.
 
 Then in any session, the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` tools become available. Run `parecode doctor` to confirm registration, hook status, and `.codegraph/` pairing if present.
+
+### Optional: the `parecode-explore` plugin
+
+Parecode also ships a Claude Code plugin (bundled in the same npm package) that adds a read-only `parecode-explore` subagent and a matching skill. The agent is pinned to Haiku and is given only `ParecodeSearch`, so exploration-style questions ("where is X?", "how does Y work?", "find all usages of Z") get answered in a cheap, isolated context window instead of burning tokens in your main session.
+
+Install it alongside the MCP server:
+
+```sh
+parecode init --with-plugin
+```
+
+This registers a local marketplace pointing at the npm-installed copy and runs `claude plugin install parecode-explore@parecode`. Remove it with `parecode init --remove-plugin`. The plugin is optional — Parecode's tools work without it.
 
 ---
 
