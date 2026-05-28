@@ -26,6 +26,74 @@ export interface SessionRollup {
   totalEstimatedTokensSaved: number;
 }
 
+export async function loadRollupWithInflight(
+  sessionDir: string,
+): Promise<{ rollup: SessionRollup[]; inflightCount: number }> {
+  const rollupFile = path.join(sessionDir, "index.json");
+
+  let rollup: SessionRollup[] = [];
+  try {
+    const data = await fs.readFile(rollupFile, "utf-8");
+    rollup = JSON.parse(data);
+  } catch {}
+
+  const knownIds = new Set(rollup.map((r) => r.sessionId));
+  let inflightCount = 0;
+
+  let files: string[] = [];
+  try {
+    files = await fs.readdir(sessionDir);
+  } catch {
+    return { rollup, inflightCount };
+  }
+
+  for (const file of files) {
+    if (!file.endsWith(".jsonl")) continue;
+    const sessionId = file.replace(".jsonl", "");
+    if (knownIds.has(sessionId)) continue;
+
+    let data = "";
+    try {
+      data = await fs.readFile(path.join(sessionDir, file), "utf-8");
+    } catch {
+      continue;
+    }
+    const lines = data.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (lines.length === 0) continue;
+
+    let startTime = "";
+    let endTime = "";
+    let totalCalls = 0;
+    let totalCallsBatched = 0;
+    let totalEstimatedTokensSaved = 0;
+
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+        totalCalls += 1;
+        totalCallsBatched += record.callsBatched || 0;
+        totalEstimatedTokensSaved += record.estimatedTokensSaved || 0;
+        if (!startTime || record.timestamp < startTime) startTime = record.timestamp;
+        if (!endTime || record.timestamp > endTime) endTime = record.timestamp;
+      } catch {}
+    }
+
+    if (totalCalls > 0) {
+      rollup.push({
+        sessionId,
+        startTime,
+        endTime,
+        totalCalls,
+        totalCallsBatched,
+        totalEstimatedTokensSaved,
+      });
+      inflightCount++;
+    }
+  }
+
+  return { rollup, inflightCount };
+}
+
 export class Tracker {
   private logFile: string;
   private sessionId: string;

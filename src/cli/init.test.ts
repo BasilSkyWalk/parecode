@@ -17,13 +17,16 @@ vi.mock("../infra/spawn.js", () => ({
 describe("initCommand --with-hook / --remove-hook", () => {
   let tmpHome: { path: string; cleanup: () => Promise<void> };
   let originalHome: string | undefined;
+  let originalConfigDir: string | undefined;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     tmpHome = await dir({ unsafeCleanup: true });
     originalHome = process.env.HOME;
+    originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.HOME = tmpHome.path;
+    delete process.env.CLAUDE_CONFIG_DIR;
     stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit:${code ?? 0}`);
@@ -33,6 +36,8 @@ describe("initCommand --with-hook / --remove-hook", () => {
   afterEach(async () => {
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = originalConfigDir;
     stdoutSpy.mockRestore();
     exitSpy.mockRestore();
     await tmpHome.cleanup();

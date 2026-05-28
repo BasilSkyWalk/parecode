@@ -1,7 +1,6 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import envPaths from "env-paths";
-import { SessionRollup } from "../stats/tracker.js";
+import { loadRollupWithInflight } from "../stats/tracker.js";
 
 export async function statsCommand(args: string[]) {
   let sinceStr = "7d";
@@ -16,26 +15,27 @@ export async function statsCommand(args: string[]) {
     }
   }
 
-  const match = sinceStr.match(/^(\d+)(d|h)$/);
+  const match = sinceStr.match(/^(\d+)(d|h|m|s)$/);
   if (!match) {
-    process.stderr.write(`Invalid --since value: ${sinceStr}. Use format like '7d' or '24h'.\n`);
+    process.stderr.write(`Invalid --since value: ${sinceStr}. Use format like '7d', '24h', '30m', or '90s'.\n`);
     process.exit(1);
   }
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
-  const ms = value * (unit === "d" ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000);
+  const unitMs: Record<string, number> = {
+    d: 24 * 60 * 60 * 1000,
+    h: 60 * 60 * 1000,
+    m: 60 * 1000,
+    s: 1000,
+  };
+  const ms = value * unitMs[unit];
   const cutoff = Date.now() - ms;
 
   const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
-  const rollupFile = path.join(dataDir, "sessions", "index.json");
+  const sessionDir = path.join(dataDir, "sessions");
 
-  let rollup: SessionRollup[] = [];
-  try {
-    const data = await fs.readFile(rollupFile, "utf-8");
-    rollup = JSON.parse(data);
-  } catch (err) {
-  }
+  const { rollup } = await loadRollupWithInflight(sessionDir);
 
   const filtered = rollup.filter((s) => new Date(s.startTime).getTime() >= cutoff);
 

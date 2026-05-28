@@ -74,7 +74,17 @@ export class SearchEngine {
     }
 
     let actualTokens = 0;
+    let estimatedNativeTokens = 0;
     const matches: NonNullable<SearchResult["matches"]> = [];
+
+    await Promise.all(
+      Array.from(fileMatches.keys()).map(async (file) => {
+        try {
+          const s = await this.host.statFile(file);
+          estimatedNativeTokens += Math.ceil(s.size / 4);
+        } catch {}
+      }),
+    );
 
     for (const [file, data] of fileMatches.entries()) {
       const allLineNumbers = Array.from(data.linesMap.keys()).sort((a, b) => a - b);
@@ -192,12 +202,15 @@ export class SearchEngine {
       });
     }
 
+    const callsBatched = matches.length > 0 ? matches.length : 0;
     this.host.recordStat({
       toolCall: "ParecodeSearch",
       pattern: args.pattern,
       truncate: "v1-text",
       filesMatched: matches.length,
+      estimatedNativeTokens,
       actualTokens,
+      callsBatched,
     });
 
     const isLargeResult = actualTokens > LARGE_RESULT_TOKEN_THRESHOLD;

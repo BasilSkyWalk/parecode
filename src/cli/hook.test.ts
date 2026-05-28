@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Readable } from "node:stream";
 import { hookCommand } from "./hook.js";
 
 describe("hookCommand", () => {
@@ -39,5 +40,49 @@ describe("hookCommand", () => {
 
   it("exits non-zero on missing subcommand", async () => {
     await expect(hookCommand([])).rejects.toThrow("exit:1");
+  });
+
+  describe("pre-tool-use", () => {
+    const originalStdin = process.stdin;
+
+    function feedStdin(input: string) {
+      const stream = Readable.from([input]) as unknown as NodeJS.ReadStream;
+      Object.defineProperty(stream, "isTTY", { value: false });
+      Object.defineProperty(process, "stdin", { configurable: true, value: stream });
+    }
+
+    afterEach(() => {
+      Object.defineProperty(process, "stdin", { configurable: true, value: originalStdin });
+    });
+
+    it("denies Grep with a redirect message", async () => {
+      feedStdin(JSON.stringify({ tool_name: "Grep", tool_input: { pattern: "foo" } }));
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+      expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/ParecodeSearch/);
+    });
+
+    it("denies Glob with a redirect message", async () => {
+      feedStdin(JSON.stringify({ tool_name: "Glob", tool_input: { pattern: "**/*.ts" } }));
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+      expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/ParecodeSearch/);
+    });
+
+    it("allows other tools through", async () => {
+      feedStdin(JSON.stringify({ tool_name: "Bash", tool_input: { command: "ls" } }));
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("allow");
+    });
+
+    it("allows when stdin is empty / malformed", async () => {
+      feedStdin("not-json");
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("allow");
+    });
   });
 });

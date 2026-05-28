@@ -58,21 +58,30 @@ export async function doctorCommand() {
     process.stdout.write(`MCP Status:    Claude CLI not found on PATH\n`);
   }
 
-  const userSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
-  let hookStatus = "Not installed";
+  const userConfigDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
+  const userSettingsPath = path.join(userConfigDir, "settings.json");
+  let sessionStartStatus = "Not installed";
+  let preToolUseStatus = "Not installed";
   try {
     const raw = await fs.readFile(userSettingsPath, "utf-8");
     const settings = JSON.parse(raw);
-    const entries = settings?.hooks?.SessionStart ?? [];
-    for (const entry of entries) {
+    for (const entry of settings?.hooks?.SessionStart ?? []) {
       for (const h of entry?.hooks ?? []) {
         if (h?.type === "command" && typeof h.command === "string" && h.command.includes("parecode hook session-start")) {
-          hookStatus = "Installed (user scope)";
+          sessionStartStatus = "Installed (user scope)";
+        }
+      }
+    }
+    for (const entry of settings?.hooks?.PreToolUse ?? []) {
+      for (const h of entry?.hooks ?? []) {
+        if (h?.type === "command" && typeof h.command === "string" && h.command.includes("parecode hook pre-tool-use")) {
+          preToolUseStatus = "Installed (user scope)";
         }
       }
     }
   } catch {}
-  process.stdout.write(`Hook Status:   ${hookStatus}\n`);
+  process.stdout.write(`SessionStart:  ${sessionStartStatus}\n`);
+  process.stdout.write(`PreToolUse:    ${preToolUseStatus}\n`);
 
   const rgCmd = os.platform() === "win32" ? "rg.exe" : "rg";
   const rgPath = await resolveCommand(rgCmd);
