@@ -22,6 +22,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 
 ### Security
 
+## [0.1.1] — 2026-05-28
+
+### Added
+
+- `ParecodeEdit` now estimates and records native tokens for each edit operation, surfacing them in session logs and `parecode stats` so token-savings figures reflect edits as well as searches.
+
 ## [0.1.0] — 2026-05-28
 
 First real release. Ships the v1 surface re-scoped per ADR 0002 (text-level truncation; no AST / tree-sitter), plus initial adoption-hook plumbing per ADR 0003.
