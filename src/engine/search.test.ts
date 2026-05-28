@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { SearchEngine } from "./search.js";
+import * as fc from "fast-check";
+import { SearchEngine, planMerges, findRelatedSymbols } from "./search.js";
 import { ToolHost } from "../adapters/base.js";
 
 interface RgEvent {
@@ -268,6 +269,278 @@ describe("SearchEngine", () => {
       expect(result.status).toBe("success");
       expect(result.matches).toHaveLength(1);
       expect(result.matches![0]).toMatchSnapshot();
+    });
+  });
+
+  describe("v0.2: token estimates", () => {
+    it("attaches per-match estimatedTokens and a response-level estimatedTokens", async () => {
+      const stdout = toRgJson([
+        { type: "match", file: "a.ts", line: 1, text: "alpha\n" },
+        { type: "match", file: "b.ts", line: 1, text: "beta\n" },
+      ]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.matches).toHaveLength(2);
+      for (const m of result.matches!) {
+        expect(m.estimatedTokens).toBe(Math.ceil(m.content.length / 4));
+      }
+      const perMatch = result.matches!.reduce((s, m) => s + m.estimatedTokens, 0);
+      expect(result.estimatedTokens).toBeGreaterThan(perMatch);
+    });
+
+    it("response-level estimatedTokens scales with envelope size", async () => {
+      const small = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hi\n" }]);
+      const manyEvents = Array.from({ length: 50 }, (_, i) => ({
+        type: "match" as const,
+        file: `dir/sub/long-name-${i}.ts`,
+        line: i + 1,
+        text: "hi\n",
+      }));
+      const big = toRgJson(manyEvents);
+      const hostSmall = makeHost({ exec: vi.fn().mockResolvedValue({ stdout: small, stderr: "", code: 0 }) });
+      const hostBig = makeHost({ exec: vi.fn().mockResolvedValue({ stdout: big, stderr: "", code: 0 }) });
+
+      const r1 = await new SearchEngine(hostSmall).search({ pattern: "hi" });
+      const r2 = await new SearchEngine(hostBig).search({ pattern: "hi" });
+      expect(r2.estimatedTokens!).toBeGreaterThan(r1.estimatedTokens!);
+    });
+  });
+
+  describe("v0.2: multi-pattern", () => {
+    it("dispatches one ripgrep call per pattern in parallel", async () => {
+      const exec = vi.fn().mockResolvedValue({ stdout: "", stderr: "", code: 1 });
+      const host = makeHost({ exec });
+      const engine = new SearchEngine(host);
+
+      await engine.search({ pattern: ["foo", "bar", "baz"] });
+
+      expect(exec).toHaveBeenCalledTimes(3);
+      expect(exec).toHaveBeenCalledWith("/usr/bin/rg", ["--json", "-C", "2", "foo", "."]);
+      expect(exec).toHaveBeenCalledWith("/usr/bin/rg", ["--json", "-C", "2", "bar", "."]);
+      expect(exec).toHaveBeenCalledWith("/usr/bin/rg", ["--json", "-C", "2", "baz", "."]);
+    });
+
+    it("single-pattern call still tags each match with patterns: [theirPattern]", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hi\n" }]);
+      const host = makeHost({ exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }) });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "needle" });
+      expect(result.matches![0].patterns).toEqual(["needle"]);
+    });
+
+    it("merges blocks from different patterns in the same file and unions their patterns lists", async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({
+          stdout: toRgJson([{ type: "match", file: "x.ts", line: 5, text: "alpha\n" }]),
+          stderr: "",
+          code: 0,
+        })
+        .mockResolvedValueOnce({
+          stdout: toRgJson([{ type: "match", file: "x.ts", line: 6, text: "beta\n" }]),
+          stderr: "",
+          code: 0,
+        });
+      const host = makeHost({ exec });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: ["alpha", "beta"] });
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches![0].patterns).toEqual(["alpha", "beta"]);
+      expect(result.matches![0].lineRanges).toEqual([[5, 6]]);
+    });
+
+    it("reports per-pattern failures in errors[] but keeps successful patterns", async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({
+          stdout: toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hit\n" }]),
+          stderr: "",
+          code: 0,
+        })
+        .mockResolvedValueOnce({ stdout: "", stderr: "bad regex", code: 2 });
+      const host = makeHost({ exec });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: ["good", "bad("] });
+      expect(result.status).toBe("success");
+      expect(result.matches).toHaveLength(1);
+      expect(result.errors).toEqual([{ pattern: "bad(", detail: "ripgrep exited with code 2" }]);
+    });
+
+    it("returns status: error when all patterns fail", async () => {
+      const exec = vi.fn().mockResolvedValue({ stdout: "", stderr: "boom", code: 2 });
+      const host = makeHost({ exec });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: ["a", "b"] });
+      expect(result.status).toBe("error");
+      expect(result.errors).toHaveLength(2);
+    });
+
+    it("throws on empty pattern array", async () => {
+      const host = makeHost();
+      const engine = new SearchEngine(host);
+      await expect(engine.search({ pattern: [] })).rejects.toThrow(/non-empty/);
+    });
+  });
+
+  describe("v0.2: dedup", () => {
+    it("merges two windows with small gap by bridging via readFile", async () => {
+      const exec = vi.fn().mockResolvedValue({
+        stdout: toRgJson([
+          { type: "match", file: "a.ts", line: 1, text: "L1\n" },
+          { type: "match", file: "a.ts", line: 4, text: "L4\n" },
+        ]),
+        stderr: "",
+        code: 0,
+      });
+      const readFile = vi.fn().mockResolvedValue("L1\nL2\nL3\nL4\nL5\n");
+      const host = makeHost({ exec, readFile });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "L" });
+      expect(result.matches).toHaveLength(1);
+      const m = result.matches![0];
+      expect(m.lineRanges).toEqual([[1, 4]]);
+      expect(m.content).toBe("L1\nL2\nL3\nL4\n");
+    });
+
+    it("falls back to unmerged windows when bridging read fails", async () => {
+      const exec = vi.fn().mockResolvedValue({
+        stdout: toRgJson([
+          { type: "match", file: "a.ts", line: 1, text: "L1\n" },
+          { type: "match", file: "a.ts", line: 4, text: "L4\n" },
+        ]),
+        stderr: "",
+        code: 0,
+      });
+      const readFile = vi.fn().mockRejectedValue(new Error("nope"));
+      const log = vi.fn();
+      const host = makeHost({ exec, readFile, log });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "L" });
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches![0].lineRanges).toEqual([[1, 1], [4, 4]]);
+      expect(log).toHaveBeenCalledWith("warn", expect.stringContaining("bridge read failed"), expect.any(Object));
+    });
+  });
+
+  describe("v0.2: planMerges", () => {
+    it("merges overlapping windows", () => {
+      const plan = planMerges([{ startLine: 1, endLine: 5 }, { startLine: 4, endLine: 8 }], 0);
+      expect(plan.groups).toEqual([[0, 1]]);
+    });
+
+    it("keeps far-apart windows separate", () => {
+      const plan = planMerges([{ startLine: 1, endLine: 3 }, { startLine: 100, endLine: 102 }], 2);
+      expect(plan.groups).toEqual([[0], [1]]);
+    });
+
+    it("merges windows with gap <= contextLines", () => {
+      const plan = planMerges([{ startLine: 1, endLine: 3 }, { startLine: 6, endLine: 8 }], 2);
+      expect(plan.groups).toEqual([[0, 1]]);
+    });
+
+    it("is order-independent (property)", () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc
+              .tuple(fc.nat({ max: 100 }), fc.nat({ max: 100 }))
+              .map(([a, b]) => ({ startLine: Math.min(a, b) + 1, endLine: Math.max(a, b) + 1 })),
+            { maxLength: 10 },
+          ),
+          fc.nat({ max: 5 }),
+          (windows, ctx) => {
+            const shuffled = [...windows].reverse();
+            const p1 = planMerges(windows, ctx);
+            const p2 = planMerges(shuffled, ctx);
+            const norm = (
+              p: { groups: number[][] },
+              src: Array<{ startLine: number; endLine: number }>,
+            ) =>
+              p.groups
+                .map((g) =>
+                  g
+                    .map((i) => `${src[i].startLine}-${src[i].endLine}`)
+                    .sort()
+                    .join(","),
+                )
+                .sort();
+            expect(norm(p1, windows)).toEqual(norm(p2, shuffled));
+          },
+        ),
+      );
+    });
+
+    it("is idempotent in terms of group count (property)", () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc
+              .tuple(fc.nat({ max: 50 }), fc.nat({ max: 50 }))
+              .map(([a, b]) => ({ startLine: Math.min(a, b) + 1, endLine: Math.max(a, b) + 1 })),
+            { minLength: 1, maxLength: 8 },
+          ),
+          fc.nat({ max: 5 }),
+          (windows, ctx) => {
+            const plan = planMerges(windows, ctx);
+            const collapsed = plan.groups.map((g) => {
+              const s = Math.min(...g.map((i) => windows[i].startLine));
+              const e = Math.max(...g.map((i) => windows[i].endLine));
+              return { startLine: s, endLine: e };
+            });
+            const replan = planMerges(collapsed, ctx);
+            expect(replan.groups.length).toBe(plan.groups.length);
+          },
+        ),
+      );
+    });
+  });
+
+  describe("v0.2: relatedSymbols", () => {
+    it("attaches related symbols to matches that contain them", async () => {
+      const stdout = toRgJson([
+        { type: "match", file: "a.ts", line: 1, text: "HandlePlayerJoin();\n" },
+        { type: "match", file: "a.ts", line: 2, text: "OnPlayerJoin();\n" },
+      ]);
+      const host = makeHost({ exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }) });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "PlayerJoin", relatedSymbols: true });
+      expect(result.matches![0].relatedSymbols).toEqual(["HandlePlayerJoin", "OnPlayerJoin"]);
+    });
+
+    it("omits relatedSymbols field when opt-in is false", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "HandleFoo()\n" }]);
+      const host = makeHost({ exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }) });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "Foo" });
+      expect(result.matches![0].relatedSymbols).toBeUndefined();
+    });
+
+    it("skips short patterns (< 4 chars) when extracting source symbols", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "HandleX OnY ZHandler\n" }]);
+      const host = makeHost({ exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }) });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "X", relatedSymbols: true });
+      expect(result.matches![0].relatedSymbols).toEqual([]);
+    });
+
+    it("caps related symbols at 10 per match", () => {
+      const content = Array.from({ length: 20 }, (_, i) => `On${"Sym" + i}Foo()`).join("\n");
+      const out = findRelatedSymbols(content, ["FooBar"]);
+      expect(out.length).toBeLessThanOrEqual(10);
     });
   });
 

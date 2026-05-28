@@ -13,6 +13,7 @@ Line 19 content to take up space.
 Line 20 content to take up space.
 Line 21 content to take up space.
 ",
+  "estimatedTokens": 61,
   "file": "large.ts",
   "lineRanges": [
     [
@@ -37,6 +38,9 @@ Line 21 content to take up space.
       22,
       30,
     ],
+  ],
+  "patterns": [
+    "take",
   ],
 }
 `;

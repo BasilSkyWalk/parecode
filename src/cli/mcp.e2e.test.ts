@@ -48,7 +48,7 @@ describe("MCP Integration E2E", () => {
   it("should list tools", async () => {
     const tools = await client.listTools();
     const toolNames = tools.tools.map((t) => t.name).sort();
-    expect(toolNames).toEqual(["ParecodeEdit", "ParecodeSearch"]);
+    expect(toolNames).toEqual(["ParecodeEdit", "ParecodeExpand", "ParecodeSearch"]);
   });
 
   it("should execute ParecodeSearch", async () => {

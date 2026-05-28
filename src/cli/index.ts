@@ -4,6 +4,8 @@ import { SearchEngine, SearchArgs } from "../engine/search.js";
 import { ParecodeSearchToolSpec } from "../tools/search.js";
 import { EditEngine, EditRequest } from "../engine/edit.js";
 import { ParecodeEditToolSpec } from "../tools/edit.js";
+import { ExpandEngine, ExpandArgs } from "../engine/expand.js";
+import { ParecodeExpandToolSpec } from "../tools/expand.js";
 import { initCommand } from "./init.js";
 import { statsCommand } from "./stats.js";
 import { pruneCommand } from "./prune.js";
@@ -30,6 +32,15 @@ async function serve() {
     async (args: unknown) => {
       const editArgs = args as EditRequest;
       return await editEngine.edit(editArgs);
+    }
+  );
+
+  const expandEngine = new ExpandEngine(adapter);
+  adapter.registerTool(
+    ParecodeExpandToolSpec,
+    async (args: unknown) => {
+      const expandArgs = args as ExpandArgs;
+      return await expandEngine.expand(expandArgs);
     }
   );
 

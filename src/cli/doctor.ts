@@ -27,6 +27,48 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
+async function findCodeGraphDir(): Promise<string | null> {
+  const cwdCandidate = path.join(process.cwd(), ".codegraph");
+  try {
+    const st = await fs.stat(cwdCandidate);
+    if (st.isDirectory()) return cwdCandidate;
+  } catch {}
+  const gitTopResult = await spawnCommand("git", ["rev-parse", "--show-toplevel"], process.cwd());
+  if (gitTopResult.code === 0) {
+    const top = gitTopResult.stdout.trim();
+    if (top) {
+      const repoCandidate = path.join(top, ".codegraph");
+      try {
+        const st = await fs.stat(repoCandidate);
+        if (st.isDirectory()) return repoCandidate;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+async function isInsideGitRepo(): Promise<boolean> {
+  const r = await spawnCommand("git", ["rev-parse", "--is-inside-work-tree"], process.cwd());
+  return r.code === 0 && r.stdout.trim() === "true";
+}
+
+async function reportCodeGraph(): Promise<void> {
+  const cgDir = await findCodeGraphDir();
+  if (cgDir) {
+    process.stdout.write(`CodeGraph:     Detected at ${cgDir}\n`);
+    process.stdout.write(
+      `               Prefer codegraph_explore for broad flow questions; use ParecodeSearch for targeted multi-pattern lookups and ParecodeExpand for widening matches.\n`,
+    );
+    return;
+  }
+  if (await isInsideGitRepo()) {
+    process.stdout.write(`CodeGraph:     Not initialised in this repo\n`);
+    process.stdout.write(
+      `               Run 'codegraph init -i' to enable broader code-graph queries alongside parecode.\n`,
+    );
+  }
+}
+
 export async function doctorCommand() {
   process.stdout.write("Parecode Doctor\n");
   process.stdout.write("───────────────\n\n");
@@ -82,6 +124,8 @@ export async function doctorCommand() {
   } catch {}
   process.stdout.write(`SessionStart:  ${sessionStartStatus}\n`);
   process.stdout.write(`PreToolUse:    ${preToolUseStatus}\n`);
+
+  await reportCodeGraph();
 
   const rgCmd = os.platform() === "win32" ? "rg.exe" : "rg";
   const rgPath = await resolveCommand(rgCmd);
