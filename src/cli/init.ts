@@ -2,7 +2,13 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
 import { spawnCommand, resolveCommand } from "../infra/spawn.js";
-import { PARECODE_PLUGIN_ID, getBundledPluginDir, isPluginInstalled } from "../infra/plugin.js";
+import {
+  PARECODE_PLUGIN_ID,
+  PARECODE_MARKETPLACE_NAME,
+  getMarketplaceSource,
+  isPluginInstalled,
+  isMarketplaceAdded,
+} from "../infra/plugin.js";
 
 interface HookEntry {
   matcher?: string;
@@ -205,7 +211,7 @@ export async function initCommand(args: string[]) {
 
   if (removePluginOnly) {
     if (printOnly) {
-      process.stdout.write(`# Would run: claude plugin remove ${PARECODE_PLUGIN_ID} -s ${scope}\n`);
+      process.stdout.write(`# Would run: claude plugin uninstall ${PARECODE_PLUGIN_ID} -s ${scope}\n`);
       return;
     }
     const claudeCmdName = process.env.PARECODE_CLAUDE_CMD || "claude";
@@ -223,9 +229,9 @@ export async function initCommand(args: string[]) {
       process.stdout.write(`No Parecode plugin found.\n`);
       return;
     }
-    const pluginResult = await spawnCommand(claudePath, ["plugin", "remove", PARECODE_PLUGIN_ID, "-s", scope]);
+    const pluginResult = await spawnCommand(claudePath, ["plugin", "uninstall", PARECODE_PLUGIN_ID, "-s", scope]);
     if (pluginResult.code !== 0) {
-      process.stderr.write(`Failed to remove Parecode plugin from Claude:\n${pluginResult.stderr || pluginResult.stdout}\n`);
+      process.stderr.write(`Failed to uninstall Parecode plugin from Claude:\n${pluginResult.stderr || pluginResult.stdout}\n`);
       process.exit(1);
     }
     process.stdout.write(`Removed Parecode plugin (scope: ${scope}).\n`);
@@ -244,7 +250,8 @@ export async function initCommand(args: string[]) {
       process.stdout.write(`# Would also install PreToolUse hook (Grep|Glob) running: ${preToolUseCommandFor(useLinked)}\n`);
     }
     if (withPlugin) {
-      process.stdout.write(`# Would also install plugin via Claude Code's plugin loader running: claude plugin add ${getBundledPluginDir()} -s ${scope}\n`);
+      process.stdout.write(`# Would ensure Parecode marketplace via: claude plugin marketplace add ${getMarketplaceSource(useLinked)}\n`);
+      process.stdout.write(`# Would install Parecode plugin via: claude plugin install ${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME} -s ${scope}\n`);
     }
     return;
   }
@@ -304,17 +311,34 @@ export async function initCommand(args: string[]) {
   }
 
   if (withPlugin) {
-    const listResult = await spawnCommand(claudePath, ["plugin", "list"]);
-    if (listResult.code !== 0) {
-      process.stderr.write(`Failed to list Claude plugins:\n${listResult.stderr || listResult.stdout}\n`);
+    const marketplaceList = await spawnCommand(claudePath, ["plugin", "marketplace", "list"]);
+    if (marketplaceList.code !== 0) {
+      process.stderr.write(`Failed to list Claude marketplaces:\n${marketplaceList.stderr || marketplaceList.stdout}\n`);
       process.exit(1);
     }
-    if (isPluginInstalled(listResult.stdout)) {
-      process.stdout.write(`Parecode plugin already present.\n`);
+    if (isMarketplaceAdded(marketplaceList.stdout)) {
+      process.stdout.write(`Parecode marketplace already configured.\n`);
     } else {
-      const pluginResult = await spawnCommand(claudePath, ["plugin", "add", getBundledPluginDir(), "-s", scope]);
-      if (pluginResult.code !== 0) {
-        process.stderr.write(`Failed to add Parecode plugin to Claude:\n${pluginResult.stderr || pluginResult.stdout}\n`);
+      const source = getMarketplaceSource(useLinked);
+      const addMarketplace = await spawnCommand(claudePath, ["plugin", "marketplace", "add", source]);
+      if (addMarketplace.code !== 0) {
+        process.stderr.write(`Failed to add Parecode marketplace to Claude:\n${addMarketplace.stderr || addMarketplace.stdout}\n`);
+        process.exit(1);
+      }
+      process.stdout.write(`Added Parecode marketplace (source: ${source}).\n`);
+    }
+
+    const pluginList = await spawnCommand(claudePath, ["plugin", "list"]);
+    if (pluginList.code !== 0) {
+      process.stderr.write(`Failed to list Claude plugins:\n${pluginList.stderr || pluginList.stdout}\n`);
+      process.exit(1);
+    }
+    if (isPluginInstalled(pluginList.stdout)) {
+      process.stdout.write(`Parecode plugin already installed.\n`);
+    } else {
+      const installResult = await spawnCommand(claudePath, ["plugin", "install", `${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME}`, "-s", scope]);
+      if (installResult.code !== 0) {
+        process.stderr.write(`Failed to install Parecode plugin:\n${installResult.stderr || installResult.stdout}\n`);
         process.exit(1);
       }
       process.stdout.write(`Installed Parecode plugin (scope: ${scope}).\n`);

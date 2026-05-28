@@ -1,0 +1,11 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "parecode-explore",
+  "version": "0.4.0",
+  "description": "Read-only exploration agent and skill that delegates 'where is X' / 'how does Y work' questions to a Haiku-powered sub-agent driven by ParecodeSearch.",
+  "author": {
+    "name": "Basil Joy",
+    "email": "basil.joy@supergaming.com"
+  },
+  "homepage": "https://github.com/BasilSkyWalk/parecode"
+}

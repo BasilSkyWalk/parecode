@@ -156,55 +156,92 @@ describe("initCommand --with-hook / --remove-hook", () => {
     expect(printed).toContain("Tip: Run 'parecode stats --retroactive'");
   });
 
-  it("--with-plugin invokes claude plugin add", async () => {
+  it("--with-plugin adds the marketplace and installs the plugin", async () => {
     const { spawnCommand } = await import("../infra/spawn.js");
     await initCommand(["--scope", "user", "--with-plugin"]);
     expect(spawnCommand).toHaveBeenCalledWith(
       "/usr/bin/claude",
-      expect.arrayContaining(["plugin", "add", expect.stringContaining("plugins/claude-code"), "-s", "user"])
+      ["plugin", "marketplace", "add", expect.stringMatching(/github\.com\/BasilSkyWalk\/parecode/)]
+    );
+    expect(spawnCommand).toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      ["plugin", "install", "parecode-explore@parecode", "-s", "user"]
     );
   });
 
-  it("--with-plugin skips add if plugin already present", async () => {
+  it("--with-plugin --linked points marketplace add at the local repo path", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--with-plugin", "--linked"]);
+    const marketplaceCalls = vi.mocked(spawnCommand).mock.calls.filter(
+      ([, args]) => Array.isArray(args) && args[1] === "marketplace" && args[2] === "add",
+    );
+    expect(marketplaceCalls).toHaveLength(1);
+    const sourceArg = marketplaceCalls[0][1][3] as string;
+    expect(sourceArg.startsWith("/")).toBe(true);
+    expect(sourceArg).not.toContain("github.com");
+  });
+
+  it("--with-plugin skips marketplace add when already configured", async () => {
     const { spawnCommand } = await import("../infra/spawn.js");
     vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
       if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
-      if (args[0] === "plugin" && args[1] === "list") {
-        return { stdout: "parecode-explore", stderr: "", code: 0 };
+      if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
+        return { stdout: "  ❯ parecode\n    Source: Directory (/x)\n", stderr: "", code: 0 };
       }
       return { stdout: "", stderr: "", code: 0 };
     });
     await initCommand(["--scope", "user", "--with-plugin"]);
     expect(spawnCommand).not.toHaveBeenCalledWith(
       "/usr/bin/claude",
-      expect.arrayContaining(["plugin", "add"])
+      expect.arrayContaining(["plugin", "marketplace", "add"])
     );
     const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
-    expect(printed).toContain("Parecode plugin already present");
+    expect(printed).toContain("Parecode marketplace already configured");
   });
 
-  it("--remove-plugin invokes claude plugin remove if present", async () => {
+  it("--with-plugin skips install when plugin already present", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
+      if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
+        return { stdout: "  ❯ parecode\n", stderr: "", code: 0 };
+      }
+      if (args[0] === "plugin" && args[1] === "list") {
+        return { stdout: "  ❯ parecode-explore@parecode\n", stderr: "", code: 0 };
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    });
+    await initCommand(["--scope", "user", "--with-plugin"]);
+    expect(spawnCommand).not.toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      expect.arrayContaining(["plugin", "install"])
+    );
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Parecode plugin already installed");
+  });
+
+  it("--remove-plugin invokes claude plugin uninstall if present", async () => {
     const { spawnCommand } = await import("../infra/spawn.js");
     vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
       if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
       if (args[0] === "plugin" && args[1] === "list") {
-        return { stdout: "parecode-explore", stderr: "", code: 0 };
+        return { stdout: "  ❯ parecode-explore@parecode\n", stderr: "", code: 0 };
       }
       return { stdout: "", stderr: "", code: 0 };
     });
     await initCommand(["--scope", "user", "--remove-plugin"]);
     expect(spawnCommand).toHaveBeenCalledWith(
       "/usr/bin/claude",
-      ["plugin", "remove", "parecode-explore", "-s", "user"]
+      ["plugin", "uninstall", "parecode-explore", "-s", "user"]
     );
   });
 
-  it("--remove-plugin skips remove if not present", async () => {
+  it("--remove-plugin skips uninstall if not present", async () => {
     const { spawnCommand } = await import("../infra/spawn.js");
     await initCommand(["--scope", "user", "--remove-plugin"]);
     expect(spawnCommand).not.toHaveBeenCalledWith(
       "/usr/bin/claude",
-      ["plugin", "remove", "parecode-explore", "-s", "user"]
+      ["plugin", "uninstall", "parecode-explore", "-s", "user"]
     );
     const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
     expect(printed).toContain("No Parecode plugin found");
@@ -215,6 +252,15 @@ describe("initCommand --with-hook / --remove-hook", () => {
     await initCommand(["--scope", "user", "--remove-plugin", "--print"]);
     expect(spawnCommand).not.toHaveBeenCalled();
     const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
-    expect(printed).toContain("claude plugin remove parecode-explore");
+    expect(printed).toContain("claude plugin uninstall parecode-explore");
+  });
+
+  it("--with-plugin --print describes both marketplace add and install", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--with-plugin", "--print"]);
+    expect(spawnCommand).not.toHaveBeenCalled();
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("claude plugin marketplace add");
+    expect(printed).toContain("claude plugin install parecode-explore@parecode");
   });
 });

@@ -17,6 +17,25 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.0] — 2026-05-28
+
+### Added
+
+- **`parecode-explore` Claude Code plugin**: a read-only exploration agent + skill that delegates "where is X" / "how does Y work" questions to a Haiku-powered sub-agent driven by `ParecodeSearch`. Ships as part of a new `parecode` marketplace (`.claude-plugin/marketplace.json`) at the repo root, with the plugin payload under `plugins/claude-code/`.
+- `parecode init --with-plugin`: idempotently adds the `parecode` marketplace (from `https://github.com/BasilSkyWalk/parecode.git`, or the local repo path when `--linked` is set) and installs `parecode-explore@parecode` at the requested scope. Honors `--print` for dry runs.
+- `parecode init --remove-plugin`: idempotently uninstalls `parecode-explore` from the requested scope. Leaves the marketplace registered so re-install is a one-step `--with-plugin`.
+- `parecode doctor`: new `Plugin Status` row reporting whether `parecode-explore` is installed and at what scope/version.
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
 ## [0.3.0] — 2026-05-28
 
 ### Added

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "parecode",
+  "description": "Plugins shipped alongside the Parecode MCP server — Claude Code agents and skills that pair with ParecodeSearch / ParecodeEdit for token-efficient exploration and editing.",
+  "owner": {
+    "name": "Basil Joy",
+    "email": "basil.joy@supergaming.com"
+  },
+  "plugins": [
+    {
+      "name": "parecode-explore",
+      "description": "Read-only exploration agent and skill that delegates 'where is X' / 'how does Y work' questions to a Haiku-powered sub-agent driven by ParecodeSearch.",
+      "author": {
+        "name": "Basil Joy"
+      },
+      "category": "development",
+      "source": "./plugins/claude-code",
+      "homepage": "https://github.com/BasilSkyWalk/parecode"
+    }
+  ]
+}
