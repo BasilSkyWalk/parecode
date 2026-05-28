@@ -25,6 +25,7 @@ const toRgJson = (events: RgEvent[]): string =>
 
 const makeHost = (overrides: Partial<ToolHost> = {}): ToolHost => ({
   registerTool: vi.fn(),
+  dispatchSubagent: vi.fn(),
   readFile: vi.fn(),
   writeFile: vi.fn(),
   log: vi.fn(),
@@ -267,6 +268,41 @@ describe("SearchEngine", () => {
       expect(result.status).toBe("success");
       expect(result.matches).toHaveLength(1);
       expect(result.matches![0]).toMatchSnapshot();
+    });
+  });
+
+  describe("recommendation", () => {
+    it("omits recommendation when result is small", async () => {
+      const events: RgEvent[] = [
+        { type: "match", file: "tiny.ts", line: 1, text: "small\n" },
+      ];
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "small" });
+
+      expect(result.status).toBe("success");
+      expect(result.recommendation).toBeUndefined();
+    });
+
+    it("includes a recommendation when result exceeds the token threshold", async () => {
+      const events: RgEvent[] = [];
+      const heavyLine = "x".repeat(200) + "\n";
+      for (let i = 1; i <= 100; i++) {
+        events.push({ type: "match", file: `huge${i}.ts`, line: i, text: heavyLine });
+      }
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.status).toBe("success");
+      expect(result.recommendation).toBeDefined();
+      expect(result.recommendation).toMatch(/Haiku|narrow/i);
     });
   });
 });

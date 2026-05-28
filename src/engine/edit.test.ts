@@ -10,6 +10,7 @@ describe("EditEngine", () => {
   it("should retrieve pre-edit stat for the file", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("foo"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -38,6 +39,7 @@ describe("EditEngine", () => {
   it("should return error status if statFile fails", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn(),
       writeFile: vi.fn(),
       log: vi.fn(),
@@ -65,6 +67,7 @@ describe("EditEngine", () => {
   it("should apply exact match edit successfully", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("const a = 1;\nconst b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -93,6 +96,7 @@ describe("EditEngine", () => {
   it("should return error if exact match fails", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("const a = 1;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -121,6 +125,7 @@ describe("EditEngine", () => {
   it("should return error if exact match has multiple occurrences", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("foo\nfoo\n"),
       writeFile: vi.fn(),
       log: vi.fn(),
@@ -149,6 +154,7 @@ describe("EditEngine", () => {
   it("should apply fuzzy match successfully if enabled", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("const   a  = \n 1;\nconst b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -179,6 +185,7 @@ describe("EditEngine", () => {
   it("should fail closed if fuzzy match confidence is too low", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("const myVar = 1;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -207,6 +214,7 @@ describe("EditEngine", () => {
   it("should process multiple edits in the same file sequentially and write once", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("let a = 1;\nlet b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -243,6 +251,7 @@ describe("EditEngine", () => {
   it("should fail the entire file if one edit fails but process other files successfully", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockImplementation(async (file: string) => {
         if (file === "test1.ts") return "let a = 1;\nlet b = 2;\n";
         if (file === "test2.ts") return "let c = 3;\n";
@@ -296,6 +305,7 @@ describe("EditEngine", () => {
 
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
       readFile: vi.fn().mockResolvedValue("let a = 1;"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -343,6 +353,7 @@ describe("EditEngine", () => {
             
             const realHost: ToolHost = {
               registerTool: vi.fn(),
+              dispatchSubagent: vi.fn(),
               readFile: async (p) => fs.readFile(p, "utf-8"),
               writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
               log: vi.fn(),
@@ -389,6 +400,7 @@ describe("EditEngine", () => {
       
       const realHost: ToolHost = {
         registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
         readFile: async (p) => {
           const originalContentRead = await fs.readFile(p, "utf-8");
           
@@ -443,6 +455,7 @@ describe("EditEngine", () => {
 
       const realHost: ToolHost = {
         registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
         readFile: async (p) => {
           readCount++;
           return fs.readFile(p, "utf-8");
@@ -494,6 +507,7 @@ describe("EditEngine", () => {
     it("should successfully apply edit with whitespace variants and produce consistent output", async () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
         readFile: vi.fn().mockResolvedValue(`function    hello  (  )   {\n\nreturn   "world"  ;\n\n}`),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -523,6 +537,7 @@ describe("EditEngine", () => {
     it("should successfully apply edit with unicode variants and produce consistent output", async () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
         readFile: vi.fn().mockResolvedValue(`const a = "café";\nconst b = "re\u0301sume\u0301";`),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),

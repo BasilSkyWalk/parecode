@@ -16,7 +16,10 @@ export interface SearchResult {
     lineRanges: Array<[number, number]>;
     omittedLineRanges?: Array<[number, number]>;
   }>;
+  recommendation?: string;
 }
+
+const LARGE_RESULT_TOKEN_THRESHOLD = 4000;
 
 export class SearchEngine {
   constructor(private host: ToolHost) {}
@@ -197,9 +200,15 @@ export class SearchEngine {
       actualTokens,
     });
 
+    const isLargeResult = actualTokens > LARGE_RESULT_TOKEN_THRESHOLD;
+    const recommendation = isLargeResult
+      ? "Result is large. Consider narrowing 'paths', tightening the pattern, or dispatching a Haiku Task subagent to extract just the relevant section before consuming the full content."
+      : undefined;
+
     return {
       status: "success",
       matches,
+      ...(recommendation ? { recommendation } : {}),
     };
   }
 }

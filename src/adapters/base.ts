@@ -10,6 +10,10 @@ export interface ToolSpec {
 
 export type ToolHandler = (args: any) => Promise<unknown>;
 
+export type SubagentResult =
+  | { status: "unavailable"; detail: string }
+  | { status: "success"; output: string };
+
 export interface ToolHost {
   registerTool(spec: ToolSpec, handler: ToolHandler): void;
   readFile(path: string): Promise<string>;
@@ -19,4 +23,5 @@ export interface ToolHost {
   exec(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number | null }>;
   resolveCommand(cmd: string): Promise<string | null>;
   statFile(path: string): Promise<{ mtimeMs: number; size: number }>;
+  dispatchSubagent(prompt: string, model: string): Promise<SubagentResult>;
 }

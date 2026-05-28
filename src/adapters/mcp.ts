@@ -2,7 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as fs from "node:fs/promises";
-import { ToolHost, ToolSpec, ToolHandler } from "./base.js";
+import { ToolHost, ToolSpec, ToolHandler, SubagentResult } from "./base.js";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 
 import { Tracker } from "../stats/tracker.js";
@@ -130,6 +130,13 @@ export class McpAdapter implements ToolHost {
 
   public async resolveCommand(cmd: string): Promise<string | null> {
     return resolveCommand(cmd);
+  }
+
+  public async dispatchSubagent(_prompt: string, _model: string): Promise<SubagentResult> {
+    return {
+      status: "unavailable",
+      detail: "subagent dispatch is not implemented in the MCP adapter (v1); the host model should invoke its own Task tool",
+    };
   }
 
   public async start(): Promise<void> {
