@@ -8,6 +8,7 @@ export async function statsCommand(args: string[]) {
   let outputJson = false;
   let retroactive = false;
   let writeSnapshot = false;
+  let includeContent = false;
 
   const durationPattern = /^(\d+)(d|h|m|s)$/;
   for (let i = 0; i < args.length; i++) {
@@ -20,6 +21,8 @@ export async function statsCommand(args: string[]) {
       retroactive = true;
     } else if (args[i] === "--write-snapshot") {
       writeSnapshot = true;
+    } else if (args[i] === "--include-content") {
+      includeContent = true;
       // Default to 30d if --retroactive is used and --since hasn't been parsed yet.
       // We will re-apply the 30d default below if sinceStr is still 7d.
     } else if (durationPattern.test(args[i])) {
@@ -56,9 +59,13 @@ export async function statsCommand(args: string[]) {
   const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
 
   if (retroactive) {
+    if (includeContent) {
+      process.stderr.write("WARNING: --include-content passed. File contents and tool results will be read into memory.\n");
+    }
     const retroResult = await runRetroactiveScan(
       cutoff,
-      writeSnapshot ? path.join(dataDir, "retroactive") : undefined
+      writeSnapshot ? path.join(dataDir, "retroactive") : undefined,
+      includeContent
     );
     totalSessions = retroResult.sessions;
     totalCalls = retroResult.toolCalls;

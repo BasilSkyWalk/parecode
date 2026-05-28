@@ -11,10 +11,9 @@ export interface TranscriptRecord {
   toolName?: string;
   input?: Record<string, unknown>;
   tokens?: TranscriptTokens;
-  raw?: unknown;
 }
 
-export function parseTranscriptLine(line: string): TranscriptRecord | null {
+export function parseTranscriptLine(line: string, includeContent = false): TranscriptRecord | null {
   if (!line.trim()) return null;
   try {
     const obj = JSON.parse(line) as Record<string, unknown>;
@@ -39,6 +38,16 @@ export function parseTranscriptLine(line: string): TranscriptRecord | null {
       input = {};
     }
 
+    let finalInput = input as Record<string, unknown>;
+    if (!includeContent && finalInput && typeof finalInput === "object") {
+      const allowedKeys = ["path", "paths", "pattern", "patterns"];
+      const filtered: Record<string, unknown> = {};
+      for (const k of allowedKeys) {
+        if (k in finalInput) filtered[k] = finalInput[k];
+      }
+      finalInput = filtered;
+    }
+
     const tokens = obj.tokens as Record<string, unknown> | undefined;
     const usage = obj.usage as Record<string, unknown> | undefined;
 
@@ -48,19 +57,18 @@ export function parseTranscriptLine(line: string): TranscriptRecord | null {
     return {
       type: typeof type === "string" ? type : undefined,
       toolName: typeof toolName === "string" ? toolName : undefined,
-      input: input as Record<string, unknown>,
+      input: finalInput,
       tokens: {
         input: typeof inputTokens === "number" ? inputTokens : undefined,
         output: typeof outputTokens === "number" ? outputTokens : undefined,
       },
-      raw: obj,
     };
   } catch {
     return null;
   }
 }
 
-export async function parseTranscriptFile(filePath: string): Promise<TranscriptRecord[]> {
+export async function parseTranscriptFile(filePath: string, includeContent = false): Promise<TranscriptRecord[]> {
   const records: TranscriptRecord[] = [];
   try {
     const fileStream = createReadStream(filePath);
@@ -70,7 +78,7 @@ export async function parseTranscriptFile(filePath: string): Promise<TranscriptR
     });
 
     for await (const line of rl) {
-      const record = parseTranscriptLine(line);
+      const record = parseTranscriptLine(line, includeContent);
       if (record) {
         records.push(record);
       }

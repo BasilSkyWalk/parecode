@@ -24,7 +24,6 @@ describe("transcriptParser", () => {
     expect(parsed?.toolName).toBe("Grep");
     expect(parsed?.input).toEqual({ pattern: "test", path: "src" });
     expect(parsed?.tokens).toEqual({ input: 100, output: 50 });
-    expect(parsed?.raw).toBeDefined();
   });
 
   it("handles drifted schema variants for toolName", () => {
@@ -57,6 +56,18 @@ describe("transcriptParser", () => {
     const parsed = parseTranscriptLine(line);
     expect(parsed?.toolName).toBeUndefined();
     expect(parsed?.tokens?.input).toBeUndefined();
-    expect(Array.isArray(parsed?.input)).toBe(true);
+    expect(parsed?.input).toEqual({});
+  });
+
+  it("filters out non-structured fields by default", () => {
+    const line = JSON.stringify({
+      toolName: "Edit",
+      input: { path: "src", fileText: "secret", command: "ls" },
+    });
+    const parsed = parseTranscriptLine(line);
+    expect(parsed?.input).toEqual({ path: "src" });
+
+    const parsedWithContent = parseTranscriptLine(line, true);
+    expect(parsedWithContent?.input).toEqual({ path: "src", fileText: "secret", command: "ls" });
   });
 });

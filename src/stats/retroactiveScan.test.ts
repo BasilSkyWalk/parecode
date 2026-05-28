@@ -53,7 +53,7 @@ describe("runRetroactiveScan", () => {
     const result = await runRetroactiveScan(3000);
     // Only new.jsonl should be parsed
     expect(transcriptParser.parseTranscriptFile).toHaveBeenCalledTimes(1);
-    expect(transcriptParser.parseTranscriptFile).toHaveBeenCalledWith("/proj1/new.jsonl");
+    expect(transcriptParser.parseTranscriptFile).toHaveBeenCalledWith("/proj1/new.jsonl", false);
     expect(result.sessions).toBe(1);
     expect(result.toolCalls).toBe(1);
   });

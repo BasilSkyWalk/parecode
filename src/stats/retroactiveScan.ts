@@ -17,7 +17,7 @@ export interface RetroactiveScanResult {
   estimatedTokensSaved: number;
 }
 
-export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string): Promise<RetroactiveScanResult> {
+export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string, includeContent = false): Promise<RetroactiveScanResult> {
   const result: RetroactiveScanResult = {
     sessions: 0,
     toolCalls: 0,
@@ -44,7 +44,7 @@ export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string)
         continue;
       }
 
-      const records = await parseTranscriptFile(sessionFile);
+      const records = await parseTranscriptFile(sessionFile, includeContent);
       if (records.length === 0) continue;
 
       result.sessions++;
