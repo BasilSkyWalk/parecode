@@ -24,6 +24,11 @@
   },
   "homepage": "https://github.com/BasilSkyWalk/parecode#readme",
   "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
   "bin": {
     "parecode": "./dist/cli/index.js"
   },
@@ -31,6 +36,7 @@
     "node": ">=20"
   },
   "files": [
+    "dist",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
