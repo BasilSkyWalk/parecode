@@ -25,3 +25,27 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vitest run
+
+  size-check:
+    name: Tarball Size Limit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: Check tarball size (Max 30MB)
+        run: |
+          npm pack
+          TARBALL=$(ls *.tgz)
+          SIZE=$(stat -c%s "$TARBALL")
+          MAX_SIZE=$((30 * 1024 * 1024))
+          echo "Tarball size: $SIZE bytes"
+          if [ $SIZE -gt $MAX_SIZE ]; then
+            echo "::error::Tarball size ($SIZE bytes) exceeds the 30MB limit ($MAX_SIZE bytes)"
+            exit 1
+          fi
