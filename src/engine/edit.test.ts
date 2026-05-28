@@ -1,4 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
+import { dir } from "tmp-promise";
+import fs from "fs/promises";
+import path from "path";
+import fc from "fast-check";
 import { EditEngine } from "./edit.js";
 import { ToolHost } from "../adapters/base.js";
 
@@ -316,5 +320,62 @@ describe("EditEngine", () => {
     expect(result.results.length).toBe(1);
     expect(result.results[0].status).toBe("conflict");
     expect(result.results[0].detail).toBe("File modified by another process during edit");
+  });
+
+  describe("property tests", () => {
+    it("should round-trip exact edits on real file system", async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.string({ minLength: 5 }),
+          fc.integer({ min: 0, max: 4 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.string(),
+          async (content, startIdx, length, newString) => {
+            fc.pre(startIdx + length <= content.length);
+            const oldString = content.substring(startIdx, startIdx + length);
+            
+            const count = content.split(oldString).length - 1;
+            fc.pre(count === 1);
+            
+            const { path: dirPath, cleanup } = await dir({ unsafeCleanup: true });
+            const filePath = path.join(dirPath, "test.txt");
+            await fs.writeFile(filePath, content, "utf-8");
+            
+            const realHost: ToolHost = {
+              registerTool: vi.fn(),
+              readFile: async (p) => fs.readFile(p, "utf-8"),
+              writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
+              log: vi.fn(),
+              recordStat: vi.fn(),
+              exec: vi.fn(),
+              resolveCommand: vi.fn(),
+              statFile: async (p) => {
+                const s = await fs.stat(p);
+                return { mtimeMs: s.mtimeMs, size: s.size };
+              },
+            };
+            
+            const engine = new EditEngine(realHost);
+            const result = await engine.edit({
+              edits: [
+                {
+                  file: filePath,
+                  oldString,
+                  newString
+                }
+              ]
+            });
+            
+            expect(result.results[0].status).toBe("success");
+            const newContent = await fs.readFile(filePath, "utf-8");
+            const expectedContent = content.substring(0, startIdx) + newString + content.substring(startIdx + length);
+            expect(newContent).toBe(expectedContent);
+            
+            await cleanup();
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
   });
 });
