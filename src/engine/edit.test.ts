@@ -483,7 +483,6 @@ describe("EditEngine", () => {
       const finalContent = await fs.readFile(filePath, "utf-8");
       expect(finalContent).toBe("let a = 100;\n");
       
-      // Proves they were batched into a single read and a single write
       expect(readCount).toBe(1);
       expect(writeCount).toBe(1);
       
