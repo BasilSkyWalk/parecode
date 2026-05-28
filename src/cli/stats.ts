@@ -7,6 +7,7 @@ export async function statsCommand(args: string[]) {
   let sinceStr = "7d";
   let outputJson = false;
   let retroactive = false;
+  let writeSnapshot = false;
 
   const durationPattern = /^(\d+)(d|h|m|s)$/;
   for (let i = 0; i < args.length; i++) {
@@ -17,6 +18,8 @@ export async function statsCommand(args: string[]) {
       outputJson = true;
     } else if (args[i] === "--retroactive") {
       retroactive = true;
+    } else if (args[i] === "--write-snapshot") {
+      writeSnapshot = true;
       // Default to 30d if --retroactive is used and --since hasn't been parsed yet.
       // We will re-apply the 30d default below if sinceStr is still 7d.
     } else if (durationPattern.test(args[i])) {
@@ -50,14 +53,18 @@ export async function statsCommand(args: string[]) {
   let totalCallsBatched = 0;
   let totalEstimatedTokensSaved = 0;
 
+  const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
+
   if (retroactive) {
-    const retroResult = await runRetroactiveScan(cutoff);
+    const retroResult = await runRetroactiveScan(
+      cutoff,
+      writeSnapshot ? path.join(dataDir, "retroactive") : undefined
+    );
     totalSessions = retroResult.sessions;
     totalCalls = retroResult.toolCalls;
     totalCallsBatched = retroResult.callsBatched;
     totalEstimatedTokensSaved = retroResult.estimatedTokensSaved;
   } else {
-    const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
     const sessionDir = path.join(dataDir, "sessions");
 
     const { rollup } = await loadRollupWithInflight(sessionDir);

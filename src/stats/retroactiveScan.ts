@@ -17,7 +17,7 @@ export interface RetroactiveScanResult {
   estimatedTokensSaved: number;
 }
 
-export async function runRetroactiveScan(cutoffMs: number): Promise<RetroactiveScanResult> {
+export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string): Promise<RetroactiveScanResult> {
   const result: RetroactiveScanResult = {
     sessions: 0,
     toolCalls: 0,
@@ -91,6 +91,16 @@ export async function runRetroactiveScan(cutoffMs: number): Promise<RetroactiveS
           result.estimatedTokensSaved += (inputTokens + outputTokens);
         }
       }
+    }
+  }
+
+  if (snapshotDir) {
+    try {
+      await fs.mkdir(snapshotDir, { recursive: true });
+      const filename = path.join(snapshotDir, `${Date.now()}.json`);
+      await fs.writeFile(filename, JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
+    } catch {
+      // Best effort snapshot write
     }
   }
 
