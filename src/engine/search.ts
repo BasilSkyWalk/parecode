@@ -1,4 +1,5 @@
 import { ToolHost } from "../adapters/base.js";
+import { estimateTokens, estimateSearchEnvelopeTokens } from "../stats/estimator.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -52,8 +53,6 @@ export interface MergePlan {
 const LARGE_RESULT_TOKEN_THRESHOLD = 4000;
 const RELATED_SYMBOL_CAP = 10;
 const MIN_SYMBOL_LENGTH = 4;
-
-const estimateTokens = (s: string): number => Math.ceil(s.length / 4);
 
 export class SearchEngine {
   constructor(private host: ToolHost) {}
@@ -155,16 +154,9 @@ export class SearchEngine {
       }),
     );
 
-    const perMatchTokens = matches.reduce((s, m) => s + m.estimatedTokens, 0);
-    const envelope: SearchResult = {
-      status: "success",
-      matches: matches.map((m) => ({ ...m, content: "" })),
-      ...(errors.length > 0 ? { errors } : {}),
-    };
-    const envelopeTokens = estimateTokens(JSON.stringify(envelope));
-    const estimatedTokensTotal = perMatchTokens + envelopeTokens;
+    const estimatedTokensTotal = estimateSearchEnvelopeTokens(matches, errors);
 
-    const actualTokens = perMatchTokens;
+    const actualTokens = matches.reduce((s, m) => s + m.estimatedTokens, 0);
 
     this.host.recordStat({
       toolCall: "ParecodeSearch",

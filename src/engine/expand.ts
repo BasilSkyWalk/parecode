@@ -1,4 +1,5 @@
 import { ToolHost } from "../adapters/base.js";
+import { estimateTokens } from "../stats/estimator.js";
 
 export interface ExpandArgs {
   file: string;
@@ -16,8 +17,6 @@ export interface ExpandResult {
   estimatedTokens?: number;
   detail?: string;
 }
-
-const estimateTokens = (s: string): number => Math.ceil(s.length / 4);
 
 export class ExpandEngine {
   constructor(private host: ToolHost) {}
