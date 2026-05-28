@@ -343,9 +343,14 @@ describe("EditEngine", () => {
           async (content, startIdx, length, newString) => {
             fc.pre(startIdx + length <= content.length);
             const oldString = content.substring(startIdx, startIdx + length);
-            
-            const count = content.split(oldString).length - 1;
-            fc.pre(count === 1);
+
+            let occurrences = 0;
+            let cursor = content.indexOf(oldString);
+            while (cursor !== -1) {
+              occurrences++;
+              cursor = content.indexOf(oldString, cursor + 1);
+            }
+            fc.pre(occurrences === 1);
             
             const { path: dirPath, cleanup } = await dir({ unsafeCleanup: true });
             const filePath = path.join(dirPath, "test.txt");
