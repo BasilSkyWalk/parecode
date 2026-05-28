@@ -22,6 +22,22 @@ Tool I/O schema breaks bump the major version and require an entry under
 
 ### Security
 
+## [0.2.0] — 2026-05-28
+
+### Added
+
+- `ParecodeSearch`: per-match `estimatedTokens` and response-level `estimatedTokens` so the model can self-budget before consuming results.
+- `ParecodeSearch`: `pattern` accepts `string | string[]`. Multiple patterns dispatch parallel ripgrep runs sharing `paths` / `contextLines`. Each match reports a `patterns: string[]` field listing every input pattern that contributed.
+- `ParecodeSearch`: overlapping or adjacent windows within the same file are merged automatically (gap ≤ `contextLines`). Bridging lines are loaded from disk; failures abandon the merge and emit unmerged windows with a `warn` log.
+- `ParecodeSearch`: opt-in `relatedSymbols: boolean` heuristic surfaces likely event-flow neighbours (`Handle<X>`, `On<X>`, `<X>Handler/Listener/Closed/Completed/Started`) per match, deduped, lexically sorted, capped at 10.
+- `ParecodeSearch`: top-level `errors: Array<{ pattern, detail }>` reports per-pattern failures when running multi-pattern; remaining patterns still return.
+- `ParecodeExpand`: new tool for widening a known `(file, startLine, endLine)` range with optional `contextBefore` / `contextAfter` padding. Returns `estimatedTokens` in the same form as `ParecodeSearch` so the same self-budgeting heuristic applies to follow-up reads.
+- `parecode doctor`: detects `.codegraph/` in the current directory or repo root and prints a hint pairing CodeGraph with parecode where present.
+
+### Changed
+
+- `ParecodeSearch` output gains `patterns` and `estimatedTokens` fields on every match. Single-pattern callers always see `patterns: [theirPattern]` (length 1). Existing v0.1 fields keep their names and types — additive only.
+
 ## [0.1.1] — 2026-05-28
 
 ### Added
