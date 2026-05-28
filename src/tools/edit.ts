@@ -3,12 +3,13 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeEditToolSpec: ToolSpec = {
   name: "ParecodeEdit",
   description:
-    "Safely edit files by providing an array of replacements. " +
-    "This tool performs atomic writes and uses mtime-based concurrency control to prevent conflicts. " +
-    "Each edit requires the target file, the exact old string to replace, and the new string. " +
-    "Edits across different files run in parallel, while multiple edits to the same file are serialized. " +
-    "If exact matching fails, you can enable fuzzy matching (`true` for whitespace tolerance, or `'aggressive'` for Unicode normalization). " +
-    "Fuzzy matching fails closed if the match confidence is below 0.85.",
+    "Apply many edits across many files in a single call. " +
+    "Prefer this over Edit / MultiEdit when: " +
+    "(a) editing across multiple files — cross-file edits run in parallel; " +
+    "(b) the exact oldString from a stale read may not match anymore — set fuzzy: true for whitespace-tolerant matching, or fuzzy: 'aggressive' for Unicode-lookalike normalization (avoids a forced re-read on whitespace drift); " +
+    "(c) you have a batch of related changes that would otherwise be N sequential Edit calls. " +
+    "Atomic writes plus mtime-based concurrency control make it safe under parallel agents. " +
+    "Fuzzy matching fails closed below 0.85 confidence and reports status: 'fuzzy_match_failed' so other edits in the batch still apply.",
   inputSchema: {
     type: "object",
     properties: {

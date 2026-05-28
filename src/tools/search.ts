@@ -2,13 +2,14 @@ import { ToolSpec } from "../adapters/base.js";
 
 export const ParecodeSearchToolSpec: ToolSpec = {
   name: "ParecodeSearch",
-  description: 
-    "Search across the codebase using ripgrep. " +
-    "Use this tool to find code quickly without consuming excessive context tokens. " +
-    "Returns structured matches with a window of context lines around each match. " +
-    "If a file has too many matches, the result is automatically chunked to stay within maxBytesPerFile, " +
-    "and omitted lines are listed as omittedLineRanges. " +
-    "The search supports regex patterns and optionally restricts to specific paths.",
+  description:
+    "Search the codebase with ripgrep and return matches with surrounding context in a single call. " +
+    "Prefer this over Grep + Read when you would otherwise read multiple files to see match context — " +
+    "ParecodeSearch returns only the relevant windows, saving substantial tokens on large files. " +
+    "Use for: 'find all callers of X', 'locate the definition of Y', 'show usages across the repo'. " +
+    "Per-file chunking via maxBytesPerFile prevents context blowups; omitted ranges are reported in " +
+    "omittedLineRanges so you can request a specific window without re-reading the whole file. " +
+    "Supports regex patterns and optional path scoping.",
   inputSchema: {
     type: "object",
     properties: {
