@@ -1,0 +1,70 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with unicode variants and produce consistent output 1`] = `
+{
+  "results": [
+    {
+      "confidence": 1,
+      "detail": "File stat successful: mtimeMs=123, size=456",
+      "file": "test.ts",
+      "matchedText": "const b = "résumé";",
+      "status": "success",
+    },
+  ],
+}
+`;
+
+exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with unicode variants and produce consistent output 2`] = `
+[MockFunction] {
+  "calls": [
+    [
+      "test.ts",
+      "const a = "coffee";
+const b = "cv";",
+    ],
+  ],
+  "results": [
+    {
+      "type": "return",
+      "value": Promise {},
+    },
+  ],
+}
+`;
+
+exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with whitespace variants and produce consistent output 1`] = `
+{
+  "results": [
+    {
+      "confidence": 1,
+      "detail": "File stat successful: mtimeMs=123, size=456",
+      "file": "test.ts",
+      "matchedText": "function    hello  (  )   {
+
+return   "world"  ;
+
+}",
+      "status": "success",
+    },
+  ],
+}
+`;
+
+exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with whitespace variants and produce consistent output 2`] = `
+[MockFunction] {
+  "calls": [
+    [
+      "test.ts",
+      "function hello() {
+  return "parecode";
+}",
+    ],
+  ],
+  "results": [
+    {
+      "type": "return",
+      "value": Promise {},
+    },
+  ],
+}
+`;

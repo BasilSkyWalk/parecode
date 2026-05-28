@@ -378,4 +378,70 @@ describe("EditEngine", () => {
       );
     });
   });
+
+  describe("fuzzy snapshot tests", () => {
+    it("should successfully apply edit with whitespace variants and produce consistent output", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        readFile: vi.fn().mockResolvedValue(`function    hello  (  )   {\n\nreturn   "world"  ;\n\n}`),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            oldString: `function hello() {\n  return "world";\n}`,
+            newString: `function hello() {\n  return "parecode";\n}`,
+            fuzzy: true
+          }
+        ]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(result).toMatchSnapshot();
+      expect(mockHost.writeFile).toMatchSnapshot();
+    });
+
+    it("should successfully apply edit with unicode variants and produce consistent output", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        readFile: vi.fn().mockResolvedValue(`const a = "café";\nconst b = "re\u0301sume\u0301";`),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            oldString: `const a = "cafe\u0301";`, // search using combining acute
+            newString: `const a = "coffee";`,
+            fuzzy: "aggressive"
+          },
+          {
+            file: "test.ts",
+            oldString: `const b = "résumé";`, // search using composed
+            newString: `const b = "cv";`,
+            fuzzy: "aggressive"
+          }
+        ]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(result).toMatchSnapshot();
+      expect(mockHost.writeFile).toMatchSnapshot();
+    });
+  });
 });
