@@ -245,7 +245,6 @@ describe("SearchEngine", () => {
     it("should match snapshot for chunked result with expected windows and omitted ranges", async () => {
       const filler = (n: number) => `Line ${n} content to take up space.\n`;
       const events: RgEvent[] = [];
-      // 30 lines total. Matches on line 10 and 20.
       for (let line = 1; line <= 30; line++) {
         events.push({
           type: line === 10 || line === 20 ? "match" : "context",
@@ -262,7 +261,7 @@ describe("SearchEngine", () => {
 
       const result = await engine.search({
         pattern: "take",
-        maxBytesPerFile: 250, // Force chunking. ~8 lines total (250 / 32)
+        maxBytesPerFile: 250,
       });
 
       expect(result.status).toBe("success");

@@ -426,13 +426,13 @@ describe("EditEngine", () => {
         edits: [
           {
             file: "test.ts",
-            oldString: `const a = "cafe\u0301";`, // search using combining acute
+            oldString: `const a = "cafe\u0301";`,
             newString: `const a = "coffee";`,
             fuzzy: "aggressive"
           },
           {
             file: "test.ts",
-            oldString: `const b = "résumé";`, // search using composed
+            oldString: `const b = "résumé";`,
             newString: `const b = "cv";`,
             fuzzy: "aggressive"
           }

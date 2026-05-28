@@ -1,29 +1,59 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as fs from "node:fs/promises";
 import { ToolHost, ToolSpec, ToolHandler } from "./base.js";
-import { z } from "zod";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 
 import { Tracker } from "../stats/tracker.js";
 
 export class McpAdapter implements ToolHost {
-  private server: McpServer;
+  private server: Server;
   private tracker: Tracker;
+  private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
 
   constructor() {
     this.tracker = new Tracker();
-    this.server = new McpServer(
-      {
-        name: "parecode",
-        version: "0.0.0",
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
+    this.server = new Server(
+      { name: "parecode", version: "0.0.0" },
+      { capabilities: { tools: {} } }
     );
+
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: Array.from(this.tools.values()).map(t => ({
+          name: t.spec.name,
+          description: t.spec.description,
+          inputSchema: t.spec.inputSchema as any
+        }))
+      };
+    });
+
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const tool = this.tools.get(request.params.name);
+      if (!tool) {
+        throw new Error(`Tool not found: ${request.params.name}`);
+      }
+      try {
+        const result = await tool.handler(request.params.arguments);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      } catch (error) {
+        const err = error as Error;
+        this.recordStat({
+          toolCall: tool.spec.name,
+          estimatedNativeTokens: 0,
+          actualTokens: 0,
+          callsBatched: 0,
+          error: err.message,
+        });
+        return {
+          content: [{ type: "text", text: `Error: ${err.message}` }],
+          isError: true,
+        };
+      }
+    });
   }
 
   public async initTracker(): Promise<void> {
@@ -35,34 +65,7 @@ export class McpAdapter implements ToolHost {
   }
 
   public registerTool(spec: ToolSpec, handler: ToolHandler): void {
-    this.server.tool(
-      spec.name,
-      spec.description,
-      {
-        args: z.any(),
-      },
-      async (args) => {
-        try {
-          const result = await handler(args.args);
-          return {
-            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          };
-        } catch (error) {
-          const err = error as Error;
-          this.recordStat({
-            toolCall: spec.name,
-            estimatedNativeTokens: 0,
-            actualTokens: 0,
-            callsBatched: 0,
-            error: err.message,
-          });
-          return {
-            content: [{ type: "text", text: `Error: ${err.message}` }],
-            isError: true,
-          };
-        }
-      }
-    );
+    this.tools.set(spec.name, { spec, handler });
   }
 
   public async readFile(path: string): Promise<string> {
