@@ -16,17 +16,16 @@ vi.mock("../infra/spawn.js", () => ({
 
 describe("initCommand --with-hook / --remove-hook", () => {
   let tmpHome: { path: string; cleanup: () => Promise<void> };
-  let originalHome: string | undefined;
+  let configDir: string;
   let originalConfigDir: string | undefined;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     tmpHome = await dir({ unsafeCleanup: true });
-    originalHome = process.env.HOME;
+    configDir = path.join(tmpHome.path, ".claude");
     originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
-    process.env.HOME = tmpHome.path;
-    delete process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = configDir;
     stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit:${code ?? 0}`);
@@ -34,8 +33,6 @@ describe("initCommand --with-hook / --remove-hook", () => {
   });
 
   afterEach(async () => {
-    if (originalHome === undefined) delete process.env.HOME;
-    else process.env.HOME = originalHome;
     if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = originalConfigDir;
     stdoutSpy.mockRestore();
@@ -46,7 +43,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
   it("writes a SessionStart hook entry to user settings.json when --with-hook is set", async () => {
     await initCommand(["--scope", "user", "--with-hook"]);
 
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     const raw = await fs.readFile(settingsPath, "utf-8");
     const settings = JSON.parse(raw);
     expect(settings.hooks.SessionStart).toHaveLength(1);
@@ -56,7 +53,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
   it("uses the linked command in the hook entry when --linked is set", async () => {
     await initCommand(["--scope", "user", "--with-hook", "--linked"]);
 
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
     expect(settings.hooks.SessionStart[0].hooks[0].command).toBe("parecode hook session-start");
   });
@@ -65,13 +62,13 @@ describe("initCommand --with-hook / --remove-hook", () => {
     await initCommand(["--scope", "user", "--with-hook"]);
     await initCommand(["--scope", "user", "--with-hook"]);
 
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
     expect(settings.hooks.SessionStart).toHaveLength(1);
   });
 
   it("preserves unrelated settings when installing the hook", async () => {
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     await fs.mkdir(path.dirname(settingsPath), { recursive: true });
     await fs.writeFile(
       settingsPath,
@@ -92,7 +89,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
 
     await initCommand(["--scope", "user", "--remove-hook"]);
 
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
     expect(settings.hooks?.SessionStart).toBeUndefined();
   });
@@ -100,7 +97,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
   it("--print --with-hook describes the hook but does not write settings", async () => {
     await initCommand(["--scope", "user", "--with-hook", "--print"]);
 
-    const settingsPath = path.join(tmpHome.path, ".claude", "settings.json");
+    const settingsPath = path.join(configDir, "settings.json");
     await expect(fs.access(settingsPath)).rejects.toThrow();
     const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
     expect(printed).toContain("claude mcp add parecode");
