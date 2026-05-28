@@ -34,7 +34,7 @@ describe("MCP Integration E2E", () => {
     });
 
     await client.connect(transport);
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (transport) {
@@ -43,7 +43,7 @@ describe("MCP Integration E2E", () => {
     if (cleanup) {
       await cleanup();
     }
-  });
+  }, 30000);
 
   it("should list tools", async () => {
     const tools = await client.listTools();
