@@ -4,14 +4,16 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { initCommand } from "./init.js";
 
+const defaultSpawnImpl = async (_cmd: string, args: string[]) => {
+  if (args[0] === "mcp" && args[1] === "get") {
+    return { stdout: "", stderr: "", code: 1 };
+  }
+  return { stdout: "", stderr: "", code: 0 };
+};
+
 vi.mock("../infra/spawn.js", () => ({
   resolveCommand: vi.fn().mockResolvedValue("/usr/bin/claude"),
-  spawnCommand: vi.fn().mockImplementation(async (_cmd: string, args: string[]) => {
-    if (args[0] === "mcp" && args[1] === "get") {
-      return { stdout: "", stderr: "", code: 1 };
-    }
-    return { stdout: "", stderr: "", code: 0 };
-  }),
+  spawnCommand: vi.fn(),
 }));
 
 describe("initCommand --with-hook / --remove-hook", () => {
@@ -30,6 +32,9 @@ describe("initCommand --with-hook / --remove-hook", () => {
     exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit:${code ?? 0}`);
     }) as never);
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockReset();
+    vi.mocked(spawnCommand).mockImplementation(defaultSpawnImpl);
   });
 
   afterEach(async () => {
@@ -149,5 +154,67 @@ describe("initCommand --with-hook / --remove-hook", () => {
     await initCommand(["--scope", "user"]);
     const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
     expect(printed).toContain("Tip: Run 'parecode stats --retroactive'");
+  });
+
+  it("--with-plugin invokes claude plugin add", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--with-plugin"]);
+    expect(spawnCommand).toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      expect.arrayContaining(["plugin", "add", expect.stringContaining("plugins/claude-code"), "-s", "user"])
+    );
+  });
+
+  it("--with-plugin skips add if plugin already present", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
+      if (args[0] === "plugin" && args[1] === "list") {
+        return { stdout: "parecode-explore", stderr: "", code: 0 };
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    });
+    await initCommand(["--scope", "user", "--with-plugin"]);
+    expect(spawnCommand).not.toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      expect.arrayContaining(["plugin", "add"])
+    );
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Parecode plugin already present");
+  });
+
+  it("--remove-plugin invokes claude plugin remove if present", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
+      if (args[0] === "plugin" && args[1] === "list") {
+        return { stdout: "parecode-explore", stderr: "", code: 0 };
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    });
+    await initCommand(["--scope", "user", "--remove-plugin"]);
+    expect(spawnCommand).toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      ["plugin", "remove", "parecode-explore", "-s", "user"]
+    );
+  });
+
+  it("--remove-plugin skips remove if not present", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--remove-plugin"]);
+    expect(spawnCommand).not.toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      ["plugin", "remove", "parecode-explore", "-s", "user"]
+    );
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("No Parecode plugin found");
+  });
+
+  it("--remove-plugin --print describes the removal without invoking claude", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--remove-plugin", "--print"]);
+    expect(spawnCommand).not.toHaveBeenCalled();
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("claude plugin remove parecode-explore");
   });
 });

@@ -8,6 +8,7 @@ import envPaths from "env-paths";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 import { transcriptDirExists, resolveTranscriptDir, listProjectDirs, listSessionFiles } from "../infra/claudeCodeTranscripts.js";
 import { parseTranscriptLine } from "../stats/transcriptParser.js";
+import { parsePluginListing } from "../infra/plugin.js";
 
 async function getDirSize(dirPath: string): Promise<number> {
   let size = 0;
@@ -158,8 +159,19 @@ export async function doctorCommand() {
     } else {
       process.stdout.write(`MCP Status:    Not registered\n`);
     }
+
+    const listResult = await spawnCommand(claudePath, ["plugin", "list"]);
+    let pluginStatus = "Not registered";
+    if (listResult.code === 0) {
+      const details = parsePluginListing(listResult.stdout);
+      if (details) {
+        pluginStatus = `Installed (scope: ${details.scope}, version: ${details.version})`;
+      }
+    }
+    process.stdout.write(`Plugin Status: ${pluginStatus}\n`);
   } else {
     process.stdout.write(`MCP Status:    Claude CLI not found on PATH\n`);
+    process.stdout.write(`Plugin Status: Claude CLI not found on PATH\n`);
   }
 
   const userConfigDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");

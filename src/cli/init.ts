@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
 import { spawnCommand, resolveCommand } from "../infra/spawn.js";
+import { PARECODE_PLUGIN_ID, getBundledPluginDir, isPluginInstalled } from "../infra/plugin.js";
 
 interface HookEntry {
   matcher?: string;
@@ -157,6 +158,8 @@ export async function initCommand(args: string[]) {
   let hookExplicitlySet = false;
   let aggressiveHook = false;
   let removeHookOnly = false;
+  let withPlugin = false;
+  let removePluginOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--scope" && i + 1 < args.length) {
@@ -178,6 +181,10 @@ export async function initCommand(args: string[]) {
       hookExplicitlySet = true;
     } else if (args[i] === "--remove-hook") {
       removeHookOnly = true;
+    } else if (args[i] === "--with-plugin") {
+      withPlugin = true;
+    } else if (args[i] === "--remove-plugin") {
+      removePluginOnly = true;
     }
   }
 
@@ -196,6 +203,35 @@ export async function initCommand(args: string[]) {
     return;
   }
 
+  if (removePluginOnly) {
+    if (printOnly) {
+      process.stdout.write(`# Would run: claude plugin remove ${PARECODE_PLUGIN_ID} -s ${scope}\n`);
+      return;
+    }
+    const claudeCmdName = process.env.PARECODE_CLAUDE_CMD || "claude";
+    const claudePath = await resolveCommand(claudeCmdName);
+    if (!claudePath) {
+      process.stderr.write(`Error: '${claudeCmdName}' CLI not found on PATH.\n`);
+      process.exit(1);
+    }
+    const listResult = await spawnCommand(claudePath, ["plugin", "list"]);
+    if (listResult.code !== 0) {
+      process.stderr.write(`Failed to list Claude plugins:\n${listResult.stderr || listResult.stdout}\n`);
+      process.exit(1);
+    }
+    if (!isPluginInstalled(listResult.stdout)) {
+      process.stdout.write(`No Parecode plugin found.\n`);
+      return;
+    }
+    const pluginResult = await spawnCommand(claudePath, ["plugin", "remove", PARECODE_PLUGIN_ID, "-s", scope]);
+    if (pluginResult.code !== 0) {
+      process.stderr.write(`Failed to remove Parecode plugin from Claude:\n${pluginResult.stderr || pluginResult.stdout}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(`Removed Parecode plugin (scope: ${scope}).\n`);
+    return;
+  }
+
   const serveCommand = useLinked ? ["parecode", "serve"] : ["npx", "parecode", "serve"];
   const addCmdStr = `claude mcp add parecode -s ${scope} -- ${serveCommand.join(" ")}`;
 
@@ -206,6 +242,9 @@ export async function initCommand(args: string[]) {
     }
     if (aggressiveHook) {
       process.stdout.write(`# Would also install PreToolUse hook (Grep|Glob) running: ${preToolUseCommandFor(useLinked)}\n`);
+    }
+    if (withPlugin) {
+      process.stdout.write(`# Would also install plugin via Claude Code's plugin loader running: claude plugin add ${getBundledPluginDir()} -s ${scope}\n`);
     }
     return;
   }
@@ -261,6 +300,24 @@ export async function initCommand(args: string[]) {
       process.stdout.write(`Installed PreToolUse hook (Grep|Glob → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
     } else {
       process.stdout.write(`PreToolUse hook already present at ${resolveSettingsPath(scope)}.\n`);
+    }
+  }
+
+  if (withPlugin) {
+    const listResult = await spawnCommand(claudePath, ["plugin", "list"]);
+    if (listResult.code !== 0) {
+      process.stderr.write(`Failed to list Claude plugins:\n${listResult.stderr || listResult.stdout}\n`);
+      process.exit(1);
+    }
+    if (isPluginInstalled(listResult.stdout)) {
+      process.stdout.write(`Parecode plugin already present.\n`);
+    } else {
+      const pluginResult = await spawnCommand(claudePath, ["plugin", "add", getBundledPluginDir(), "-s", scope]);
+      if (pluginResult.code !== 0) {
+        process.stderr.write(`Failed to add Parecode plugin to Claude:\n${pluginResult.stderr || pluginResult.stdout}\n`);
+        process.exit(1);
+      }
+      process.stdout.write(`Installed Parecode plugin (scope: ${scope}).\n`);
     }
   }
 
