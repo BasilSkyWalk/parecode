@@ -54,27 +54,11 @@ describe('statsCommand', () => {
   });
 
   it('prints retroactive stats as text', async () => {
-    vi.mock('../stats/retroactiveScan.js', () => ({
-      runRetroactiveScan: async () => ({
-        sessions: 5,
-        toolCalls: 42,
-        callsBatched: 20,
-        estimatedTokensSaved: 12345
-      })
-    }));
     await statsCommand(['--retroactive']);
     expect(stdoutWriteSpy.mock.calls.map((c: any) => c[0]).join('')).toMatchSnapshot();
   });
 
   it('prints retroactive stats as json', async () => {
-    vi.mock('../stats/retroactiveScan.js', () => ({
-      runRetroactiveScan: async () => ({
-        sessions: 5,
-        toolCalls: 42,
-        callsBatched: 20,
-        estimatedTokensSaved: 12345
-      })
-    }));
     await statsCommand(['--retroactive', '--json']);
     expect(stdoutWriteSpy.mock.calls.map((c: any) => c[0]).join('')).toMatchSnapshot();
   });

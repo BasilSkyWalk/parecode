@@ -11,7 +11,20 @@ Tool I/O schema breaks bump the major version and require an entry under
 ## [Unreleased]
 
 ### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
 
+## [0.3.0] — 2026-05-28
+
+### Added
+
+- `parecode stats --retroactive`: scan your past Claude Code session transcripts (`~/.claude/projects/**`) to see how many tokens Parecode would have saved you. Uses a local JSONL parser and classifier to estimate savings from replaceable Search and Edit calls, plus avoided follow-up Reads.
+- `parecode stats --write-snapshot`: optionally save the retroactive scan results to the data directory.
+- `parecode doctor`: now checks for the presence of the Claude Code transcripts directory and sniffs the JSONL schema to warn if the format has drifted.
+- `parecode init` prints a one-line tip nudging users to run the retroactive scan to see token savings.
 - `parecode init --no-hook`: opt out of the SessionStart hook on a per-invocation basis.
 
 ### Changed
@@ -21,8 +34,6 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Deprecated
 
 - `parecode init --with-hook` is now a no-op (the behavior it requested is the default). The flag will be removed in a future minor release.
-
-### Removed
 
 ### Fixed
 

@@ -144,4 +144,10 @@ describe("initCommand --with-hook / --remove-hook", () => {
     const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
     expect(settings.hooks.SessionStart).toHaveLength(1);
   });
+
+  it("prints a nudge to run the retroactive scan at the end", async () => {
+    await initCommand(["--scope", "user"]);
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Tip: Run 'parecode stats --retroactive'");
+  });
 });

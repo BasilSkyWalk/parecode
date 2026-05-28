@@ -263,4 +263,6 @@ export async function initCommand(args: string[]) {
       process.stdout.write(`PreToolUse hook already present at ${resolveSettingsPath(scope)}.\n`);
     }
   }
+
+  process.stdout.write("\nTip: Run 'parecode stats --retroactive' to see token savings on past sessions.\n");
 }

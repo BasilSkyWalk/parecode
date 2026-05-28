@@ -1,0 +1,2 @@
+{"tool_name":"Grep","arguments":"{\"pattern\":\"world\"}","usage":{"prompt_tokens":50,"completion_tokens":100}}
+{"toolCall":{"name":"Edit","arguments":"{\"path\":\"app.ts\"}"},"tokens":{"input":800,"output":40}}

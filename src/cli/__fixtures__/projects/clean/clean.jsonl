@@ -1,0 +1,3 @@
+{"type":"tool_call","toolName":"Grep","input":{"pattern":"hello","path":"."},"tokens":{"input":100,"output":200}}
+{"type":"tool_call","toolName":"Read","input":{"path":"index.ts"},"tokens":{"input":150,"output":300}}
+{"type":"tool_call","toolName":"Edit","input":{"path":"index.ts"},"tokens":{"input":500,"output":50}}

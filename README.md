@@ -59,6 +59,30 @@ Then in any session, the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` 
 
 ---
 
+## Retroactive Savings Scan
+
+Curious how much Parecode would have saved you if you had installed it earlier? You can scan your past Claude Code sessions:
+
+```sh
+parecode stats --retroactive --since 30d
+```
+
+Sample output:
+```text
+Parecode — last 30d (retroactive scan)
+─────────────────────
+Sessions:                   42
+Tool calls:                156
+Calls batched (est):        89
+Tokens saved (est):  1,200,000
+
+* Note: Retroactive savings are estimated, not measured.
+```
+
+**Privacy disclaimer:** This scan runs entirely locally against Claude Code's session transcripts (`~/.claude/projects/**`). By default, it parses only structured fields (tool names, paths, patterns, and token counts). It does not send any data over the network. The `--include-content` flag (which allows reading tool input/output) is strictly opt-in and loudly flagged if used.
+
+---
+
 ## Privacy
 
 Parecode performs **no network calls at runtime**. Session logs are written to your OS data directory (resolved via [`env-paths`](https://github.com/sindresorhus/env-paths)) with `0600` permissions on Unix. Prune with `parecode prune <days>` or wipe the data dir.

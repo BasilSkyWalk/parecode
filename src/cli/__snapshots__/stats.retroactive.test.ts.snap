@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`statsCommand --retroactive integration > prints retroactive stats correctly using real fixtures 1`] = `
+"Parecode — last 10000d (retroactive scan)
+─────────────────────
+Sessions:                    2
+Tool calls:                  5
+Calls batched (est):         0
+Tokens saved (est):        840
+
+* Note: Retroactive savings are estimated, not measured.
+"
+`;
