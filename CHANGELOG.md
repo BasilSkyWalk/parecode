@@ -17,6 +17,17 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.1] — 2026-05-28
+
+### Changed
+
+- `parecode init` now installs the `parecode-explore` Claude Code plugin by default, mirroring the existing default-on behavior of the SessionStart hook. The plugin step soft-fails with a warning (rather than aborting `init`) when the local `claude` build does not support the `plugin` subcommand. Pass `--no-plugin` to skip it; `--with-plugin` remains supported and makes plugin-step failures hard-fail.
+
+### Added
+
+- `parecode init --no-plugin` opt-out flag, parallel to `--no-hook`.
+- README section describing the bundled `parecode-explore` plugin and the new default behavior.
+
 ## [0.4.0] — 2026-05-28
 
 ### Added
