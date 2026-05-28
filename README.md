@@ -2,8 +2,6 @@
 
 An MCP server that gives coding agents context-window-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.
 
-> **Status:** pre-M0. The package name is reserved; the implementation is in active development.
-
 ---
 
 ## Requirements
@@ -41,13 +39,19 @@ parecode init --print               # print the equivalent command without runni
 parecode init --remove-hook         # remove the SessionStart hook
 ```
 
-Then in any session, the `ParecodeSearch` and `ParecodeEdit` tools become available. Run `parecode doctor` to confirm registration and hook status.
+Then in any session, the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` tools become available. Run `parecode doctor` to confirm registration, hook status, and `.codegraph/` pairing if present.
 
 ---
 
 ## What it does
 
-- **`ParecodeSearch`** — ripgrep-backed search that returns matches with surrounding context windows in a single call, with per-file byte chunking so large result sets do not blow up your context. Omitted line ranges are reported so the agent can request a specific window without re-reading the whole file.
+- **`ParecodeSearch`** — ripgrep-backed search that returns matches with surrounding context windows in a single call, with per-file byte chunking so large result sets do not blow up your context.
+  - `pattern` accepts a single string or an array of strings; arrays dispatch parallel ripgrep runs sharing the same `paths` / `contextLines`, and each match carries a `patterns: string[]` field listing which input patterns contributed. One call replaces N back-to-back greps for related-keyword flow tracing.
+  - Overlapping or adjacent windows within the same file are merged automatically (gap ≤ `contextLines`), with bridging lines loaded from disk.
+  - Per-match and response-level `estimatedTokens` are returned so the agent can self-budget before consuming results.
+  - Opt-in `relatedSymbols: true` surfaces likely event-flow neighbours (`Handle<X>`, `On<X>`, `<X>Handler/Listener/Closed/Completed/Started`) discovered in each match, capped at 10.
+  - Omitted line ranges are reported so the agent can widen with `ParecodeExpand` without re-reading the whole file.
+- **`ParecodeExpand`** — widen a known `(file, startLine, endLine)` range with optional `contextBefore` / `contextAfter` padding. Designed as the natural follow-up to a `ParecodeSearch` match. Returns the same `estimatedTokens` shape so the same self-budgeting heuristic applies. Prefer this over a full-file `Read` after locating a line.
 - **`ParecodeEdit`** — batched multi-file edits with whitespace-tolerant fuzzy matching (and an opt-in Unicode-lookalike mode), pre/post `stat` conflict detection, and atomic same-directory rename writes. Cross-file edits run in parallel.
 - **`parecode stats`** — local JSONL session log with token-saved estimates. Zero network. Zero telemetry.
 
