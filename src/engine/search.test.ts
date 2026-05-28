@@ -240,4 +240,34 @@ describe("SearchEngine", () => {
     expect(result.matches).toHaveLength(1);
     expect(result.matches![0].file).toBe("a.ts");
   });
+
+  describe("snapshot tests", () => {
+    it("should match snapshot for chunked result with expected windows and omitted ranges", async () => {
+      const filler = (n: number) => `Line ${n} content to take up space.\n`;
+      const events: RgEvent[] = [];
+      // 30 lines total. Matches on line 10 and 20.
+      for (let line = 1; line <= 30; line++) {
+        events.push({
+          type: line === 10 || line === 20 ? "match" : "context",
+          file: "large.ts",
+          line,
+          text: filler(line),
+        });
+      }
+      const stdout = toRgJson(events);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({
+        pattern: "take",
+        maxBytesPerFile: 250, // Force chunking. ~8 lines total (250 / 32)
+      });
+
+      expect(result.status).toBe("success");
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches![0]).toMatchSnapshot();
+    });
+  });
 });

@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SearchEngine > snapshot tests > should match snapshot for chunked result with expected windows and omitted ranges 1`] = `
+{
+  "content": "Line 8 content to take up space.
+Line 9 content to take up space.
+Line 10 content to take up space.
+Line 11 content to take up space.
+
+---
+
+Line 19 content to take up space.
+Line 20 content to take up space.
+Line 21 content to take up space.
+",
+  "file": "large.ts",
+  "lineRanges": [
+    [
+      8,
+      11,
+    ],
+    [
+      19,
+      21,
+    ],
+  ],
+  "omittedLineRanges": [
+    [
+      1,
+      7,
+    ],
+    [
+      12,
+      18,
+    ],
+    [
+      22,
+      30,
+    ],
+  ],
+}
+`;
