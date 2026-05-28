@@ -263,4 +263,67 @@ describe("initCommand --with-hook / --remove-hook", () => {
     expect(printed).toContain("claude plugin marketplace add");
     expect(printed).toContain("claude plugin install parecode-explore@parecode");
   });
+
+  it("installs the plugin by default with no plugin flag", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user"]);
+    expect(spawnCommand).toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      ["plugin", "install", "parecode-explore@parecode", "-s", "user"]
+    );
+  });
+
+  it("names the opt-out flag in the install message when the plugin is installed by default", async () => {
+    await initCommand(["--scope", "user"]);
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Installed Parecode plugin");
+    expect(printed).toContain("--no-plugin");
+  });
+
+  it("does not name the opt-out flag when the plugin is installed via explicit --with-plugin", async () => {
+    await initCommand(["--scope", "user", "--with-plugin"]);
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Installed Parecode plugin");
+    expect(printed).not.toContain("--no-plugin");
+  });
+
+  it("--no-plugin skips plugin install entirely", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    await initCommand(["--scope", "user", "--no-plugin"]);
+    expect(spawnCommand).not.toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      expect.arrayContaining(["plugin", "marketplace", "list"])
+    );
+    expect(spawnCommand).not.toHaveBeenCalledWith(
+      "/usr/bin/claude",
+      expect.arrayContaining(["plugin", "install"])
+    );
+  });
+
+  it("default plugin install soft-fails when claude plugin commands fail", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
+      if (args[0] === "plugin") return { stdout: "", stderr: "unknown command: plugin", code: 1 };
+      return { stdout: "", stderr: "", code: 0 };
+    });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await expect(initCommand(["--scope", "user"])).resolves.toBeUndefined();
+    const erred = stderrSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(erred).toContain("Warning");
+    expect(erred).toContain("--with-plugin");
+    stderrSpy.mockRestore();
+  });
+
+  it("explicit --with-plugin still hard-fails when claude plugin commands fail", async () => {
+    const { spawnCommand } = await import("../infra/spawn.js");
+    vi.mocked(spawnCommand).mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args[0] === "mcp" && args[1] === "get") return { stdout: "", stderr: "", code: 1 };
+      if (args[0] === "plugin") return { stdout: "", stderr: "unknown command: plugin", code: 1 };
+      return { stdout: "", stderr: "", code: 0 };
+    });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await expect(initCommand(["--scope", "user", "--with-plugin"])).rejects.toThrow(/exit:1/);
+    stderrSpy.mockRestore();
+  });
 });

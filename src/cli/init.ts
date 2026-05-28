@@ -164,7 +164,8 @@ export async function initCommand(args: string[]) {
   let hookExplicitlySet = false;
   let aggressiveHook = false;
   let removeHookOnly = false;
-  let withPlugin = false;
+  let withPlugin = true;
+  let pluginExplicitlySet = false;
   let removePluginOnly = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -189,6 +190,10 @@ export async function initCommand(args: string[]) {
       removeHookOnly = true;
     } else if (args[i] === "--with-plugin") {
       withPlugin = true;
+      pluginExplicitlySet = true;
+    } else if (args[i] === "--no-plugin") {
+      withPlugin = false;
+      pluginExplicitlySet = true;
     } else if (args[i] === "--remove-plugin") {
       removePluginOnly = true;
     }
@@ -311,37 +316,48 @@ export async function initCommand(args: string[]) {
   }
 
   if (withPlugin) {
+    const fail = (label: string, body: string): boolean => {
+      if (pluginExplicitlySet) {
+        process.stderr.write(`${label}:\n${body}\n`);
+        process.exit(1);
+      }
+      const firstLine = (body || "").split("\n")[0] || "";
+      process.stderr.write(`Warning: ${label.toLowerCase()} — skipping plugin install (pass --with-plugin to require it). ${firstLine}\n`);
+      return true;
+    };
+
+    const pluginSuffix = pluginExplicitlySet ? "" : " (default; pass --no-plugin to opt out)";
+    let pluginAborted = false;
+
     const marketplaceList = await spawnCommand(claudePath, ["plugin", "marketplace", "list"]);
     if (marketplaceList.code !== 0) {
-      process.stderr.write(`Failed to list Claude marketplaces:\n${marketplaceList.stderr || marketplaceList.stdout}\n`);
-      process.exit(1);
-    }
-    if (isMarketplaceAdded(marketplaceList.stdout)) {
+      pluginAborted = fail("Failed to list Claude marketplaces", marketplaceList.stderr || marketplaceList.stdout);
+    } else if (isMarketplaceAdded(marketplaceList.stdout)) {
       process.stdout.write(`Parecode marketplace already configured.\n`);
     } else {
       const source = getMarketplaceSource(useLinked);
       const addMarketplace = await spawnCommand(claudePath, ["plugin", "marketplace", "add", source]);
       if (addMarketplace.code !== 0) {
-        process.stderr.write(`Failed to add Parecode marketplace to Claude:\n${addMarketplace.stderr || addMarketplace.stdout}\n`);
-        process.exit(1);
+        pluginAborted = fail("Failed to add Parecode marketplace to Claude", addMarketplace.stderr || addMarketplace.stdout);
+      } else {
+        process.stdout.write(`Added Parecode marketplace (source: ${source}).\n`);
       }
-      process.stdout.write(`Added Parecode marketplace (source: ${source}).\n`);
     }
 
-    const pluginList = await spawnCommand(claudePath, ["plugin", "list"]);
-    if (pluginList.code !== 0) {
-      process.stderr.write(`Failed to list Claude plugins:\n${pluginList.stderr || pluginList.stdout}\n`);
-      process.exit(1);
-    }
-    if (isPluginInstalled(pluginList.stdout)) {
-      process.stdout.write(`Parecode plugin already installed.\n`);
-    } else {
-      const installResult = await spawnCommand(claudePath, ["plugin", "install", `${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME}`, "-s", scope]);
-      if (installResult.code !== 0) {
-        process.stderr.write(`Failed to install Parecode plugin:\n${installResult.stderr || installResult.stdout}\n`);
-        process.exit(1);
+    if (!pluginAborted) {
+      const pluginList = await spawnCommand(claudePath, ["plugin", "list"]);
+      if (pluginList.code !== 0) {
+        pluginAborted = fail("Failed to list Claude plugins", pluginList.stderr || pluginList.stdout);
+      } else if (isPluginInstalled(pluginList.stdout)) {
+        process.stdout.write(`Parecode plugin already installed.\n`);
+      } else {
+        const installResult = await spawnCommand(claudePath, ["plugin", "install", `${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME}`, "-s", scope]);
+        if (installResult.code !== 0) {
+          pluginAborted = fail("Failed to install Parecode plugin", installResult.stderr || installResult.stdout);
+        } else {
+          process.stdout.write(`Installed Parecode plugin (scope: ${scope})${pluginSuffix}.\n`);
+        }
       }
-      process.stdout.write(`Installed Parecode plugin (scope: ${scope}).\n`);
     }
   }
 
