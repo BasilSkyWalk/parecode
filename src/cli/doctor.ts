@@ -2,8 +2,12 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
+import * as readline from "node:readline";
+import { createReadStream } from "node:fs";
 import envPaths from "env-paths";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
+import { transcriptDirExists, resolveTranscriptDir, listProjectDirs, listSessionFiles } from "../infra/claudeCodeTranscripts.js";
+import { parseTranscriptLine } from "../stats/transcriptParser.js";
 
 async function getDirSize(dirPath: string): Promise<number> {
   let size = 0;
@@ -69,6 +73,64 @@ async function reportCodeGraph(): Promise<void> {
   }
 }
 
+async function isTranscriptSchemaOk(filePath: string): Promise<boolean> {
+  try {
+    const fileStream = createReadStream(filePath);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+    for await (const line of rl) {
+      if (!line.trim()) {
+        continue;
+      }
+      const record = parseTranscriptLine(line);
+      if (record !== null && (record.type !== undefined || record.toolName !== undefined)) {
+        rl.close();
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function reportTranscripts(): Promise<void> {
+  const exists = await transcriptDirExists();
+  const dirPath = resolveTranscriptDir();
+  if (!exists) {
+    process.stdout.write(`Transcripts:   Not found at ${dirPath}\n`);
+    return;
+  }
+
+  const projects = await listProjectDirs();
+  let totalFiles = 0;
+  let firstFile: string | undefined;
+
+  for (const proj of projects) {
+    const files = await listSessionFiles(proj);
+    totalFiles += files.length;
+    if (firstFile === undefined && files.length > 0) {
+      firstFile = files[0];
+    }
+  }
+
+  process.stdout.write(`Transcripts:   Found at ${dirPath}\n`);
+  if (totalFiles === 0) {
+    process.stdout.write(`               (Directory exists, but no .jsonl session files found)\n`);
+    return;
+  }
+
+  if (firstFile === undefined) {
+    return;
+  }
+
+  const schemaOk = await isTranscriptSchemaOk(firstFile);
+  if (schemaOk) {
+    process.stdout.write(`               Schema OK (${totalFiles} files available for retroactive scan)\n`);
+  } else {
+    process.stdout.write(`               Schema UNKNOWN (JSONL format may have drifted)\n`);
+  }
+}
+
 export async function doctorCommand() {
   process.stdout.write("Parecode Doctor\n");
   process.stdout.write("───────────────\n\n");
@@ -125,6 +187,7 @@ export async function doctorCommand() {
   process.stdout.write(`SessionStart:  ${sessionStartStatus}\n`);
   process.stdout.write(`PreToolUse:    ${preToolUseStatus}\n`);
 
+  await reportTranscripts();
   await reportCodeGraph();
 
   const rgCmd = os.platform() === "win32" ? "rg.exe" : "rg";
