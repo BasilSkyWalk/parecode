@@ -32,12 +32,14 @@ Pure JavaScript — no native dependencies, no C/C++ toolchain required.
 Register the server with Claude Code:
 
 ```sh
-parecode init                       # user scope by default
-parecode init --scope project       # commit MCP config to the repo
-parecode init --with-hook           # also install a SessionStart hook that nudges Claude to prefer Parecode tools
+parecode init                       # user scope; installs MCP + SessionStart hook (default)
+parecode init --scope project       # commit MCP config + hook to the repo
+parecode init --no-hook             # register MCP only; skip the SessionStart hook
 parecode init --print               # print the equivalent command without running it
-parecode init --remove-hook         # remove the SessionStart hook
+parecode init --remove-hook         # remove the SessionStart hook (MCP stays registered)
 ```
+
+The SessionStart hook injects a short directive at the start of each session telling Claude to prefer `ParecodeSearch` / `ParecodeEdit` over the equivalent native tools. Without it, Claude's first-party `Grep` / `Read` / `Edit` tools typically win by default and Parecode's token savings never land. The hook payload is a static string; `parecode hook session-start` prints it. Pass `--no-hook` if you would rather opt in explicitly per session via your own tooling.
 
 Then in any session, the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` tools become available. Run `parecode doctor` to confirm registration, hook status, and `.codegraph/` pairing if present.
 

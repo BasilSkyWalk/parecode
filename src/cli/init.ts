@@ -153,7 +153,8 @@ export async function initCommand(args: string[]) {
   let scope = "user";
   let printOnly = false;
   let useLinked = false;
-  let withHook = false;
+  let withHook = true;
+  let hookExplicitlySet = false;
   let aggressiveHook = false;
   let removeHookOnly = false;
 
@@ -167,9 +168,14 @@ export async function initCommand(args: string[]) {
       useLinked = true;
     } else if (args[i] === "--with-hook") {
       withHook = true;
+      hookExplicitlySet = true;
+    } else if (args[i] === "--no-hook") {
+      withHook = false;
+      hookExplicitlySet = true;
     } else if (args[i] === "--aggressive-hook") {
       withHook = true;
       aggressiveHook = true;
+      hookExplicitlySet = true;
     } else if (args[i] === "--remove-hook") {
       removeHookOnly = true;
     }
@@ -241,8 +247,9 @@ export async function initCommand(args: string[]) {
 
   if (withHook) {
     const hookResult = await installHook(scope, useLinked);
+    const suffix = hookExplicitlySet ? "" : " (default; pass --no-hook to opt out)";
     if (hookResult === "installed") {
-      process.stdout.write(`Installed SessionStart hook at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`Installed SessionStart hook at ${resolveSettingsPath(scope)}${suffix}.\n`);
     } else {
       process.stdout.write(`SessionStart hook already present at ${resolveSettingsPath(scope)}.\n`);
     }

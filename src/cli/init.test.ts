@@ -103,4 +103,45 @@ describe("initCommand --with-hook / --remove-hook", () => {
     expect(printed).toContain("claude mcp add parecode");
     expect(printed).toContain("Would also install SessionStart hook");
   });
+
+  it("installs the SessionStart hook by default with no hook flag", async () => {
+    await initCommand(["--scope", "user"]);
+
+    const settingsPath = path.join(configDir, "settings.json");
+    const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toBe("npx parecode hook session-start");
+  });
+
+  it("names the opt-out flag in the install message when the hook is installed by default", async () => {
+    await initCommand(["--scope", "user"]);
+
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Installed SessionStart hook");
+    expect(printed).toContain("--no-hook");
+  });
+
+  it("does not name the opt-out flag when the hook is installed via explicit --with-hook", async () => {
+    await initCommand(["--scope", "user", "--with-hook"]);
+
+    const printed = stdoutSpy.mock.calls.map((c: unknown[]) => c[0] as string).join("");
+    expect(printed).toContain("Installed SessionStart hook");
+    expect(printed).not.toContain("--no-hook");
+  });
+
+  it("--no-hook skips hook installation entirely", async () => {
+    await initCommand(["--scope", "user", "--no-hook"]);
+
+    const settingsPath = path.join(configDir, "settings.json");
+    await expect(fs.access(settingsPath)).rejects.toThrow();
+  });
+
+  it("--no-hook leaves an existing hook untouched (use --remove-hook to remove)", async () => {
+    await initCommand(["--scope", "user", "--with-hook"]);
+    await initCommand(["--scope", "user", "--no-hook"]);
+
+    const settingsPath = path.join(configDir, "settings.json");
+    const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+  });
 });

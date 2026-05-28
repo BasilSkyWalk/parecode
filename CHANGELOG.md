@@ -12,9 +12,15 @@ Tool I/O schema breaks bump the major version and require an entry under
 
 ### Added
 
+- `parecode init --no-hook`: opt out of the SessionStart hook on a per-invocation basis.
+
 ### Changed
 
+- **Default install behavior:** `parecode init` now installs the SessionStart hook by default. Previously the hook required `--with-hook`; without it, field cohorts showed near-zero adoption of `ParecodeSearch` / `ParecodeEdit` in main sessions. Pass `--no-hook` to skip the hook (the MCP server is still registered), or `--remove-hook` to remove an already-installed hook. `--with-hook` continues to be accepted as a no-op for backward compatibility. See [ADR 0006](docs/adr/0006-default-on-session-start-hook.md).
+
 ### Deprecated
+
+- `parecode init --with-hook` is now a no-op (the behavior it requested is the default). The flag will be removed in a future minor release.
 
 ### Removed
 
