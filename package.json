@@ -1,7 +1,7 @@
 {
   "name": "parecode",
-  "version": "0.0.0",
-  "description": "MCP server for AST-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.",
+  "version": "0.1.0",
+  "description": "MCP server for token-aware code search and safe, atomic multi-file edits — built to cut Claude Code token usage on large codebases without giving up correctness.",
   "keywords": [
     "mcp",
     "model-context-protocol",
