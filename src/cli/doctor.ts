@@ -82,8 +82,8 @@ async function isTranscriptSchemaOk(filePath: string): Promise<boolean> {
       if (!line.trim()) {
         continue;
       }
-      const record = parseTranscriptLine(line);
-      if (record !== null && (record.type !== undefined || record.toolName !== undefined)) {
+      const records = parseTranscriptLine(line);
+      if (records.some((r) => r.type !== undefined || r.toolName !== undefined)) {
         rl.close();
         return true;
       }
