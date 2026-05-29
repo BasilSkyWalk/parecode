@@ -46,20 +46,46 @@ describe("spawn infra", () => {
 
   it("extracts the first path when Windows where command returns multiple lines", async () => {
     vi.mocked(os.platform).mockReturnValue("win32");
-    
+
     const mockProc = new EventEmitter() as any;
     mockProc.stdout = new EventEmitter();
     mockProc.stderr = new EventEmitter();
-    
+
     vi.mocked(cp.spawn).mockReturnValueOnce(mockProc);
-    
+
     const resolvePromise = resolveCommand("rg");
-    
+
     mockProc.stdout.emit("data", "C:\\Program Files\\rg.exe\r\nC:\\Windows\\rg.exe\r\n");
     mockProc.emit("close", 0);
-    
+
     const result = await resolvePromise;
     expect(result).toBe("C:\\Program Files\\rg.exe");
     expect(cp.spawn).toHaveBeenCalledWith("where", ["rg"]);
+  });
+
+  it("prefers a PATHEXT-executable entry over an extensionless wrapper on Windows", async () => {
+    vi.mocked(os.platform).mockReturnValue("win32");
+    const prevPathext = process.env.PATHEXT;
+    process.env.PATHEXT = ".COM;.EXE;.BAT;.CMD";
+
+    const mockProc = new EventEmitter() as any;
+    mockProc.stdout = new EventEmitter();
+    mockProc.stderr = new EventEmitter();
+
+    vi.mocked(cp.spawn).mockReturnValueOnce(mockProc);
+
+    const resolvePromise = resolveCommand("claude");
+
+    mockProc.stdout.emit(
+      "data",
+      "C:\\npm\\claude\r\nC:\\npm\\claude.cmd\r\nC:\\npm\\claude.ps1\r\n",
+    );
+    mockProc.emit("close", 0);
+
+    const result = await resolvePromise;
+    expect(result).toBe("C:\\npm\\claude.cmd");
+
+    if (prevPathext === undefined) delete process.env.PATHEXT;
+    else process.env.PATHEXT = prevPathext;
   });
 });

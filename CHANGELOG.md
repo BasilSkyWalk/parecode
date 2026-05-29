@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.2] — 2026-05-29
+
+### Fixed
+
+- `parecode init` on Windows failed with `spawn claude ENOENT` because `where claude` returns the extensionless npm shell wrapper first, which Node's `spawn` (with `shell: false`) cannot execute. `resolveCommand` now prefers entries matching `PATHEXT` (e.g. `claude.cmd`).
+
 ## [0.4.1] — 2026-05-28
 
 ### Changed

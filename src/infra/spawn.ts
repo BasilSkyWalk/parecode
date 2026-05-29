@@ -14,8 +14,21 @@ export async function resolveCommand(cmd: string): Promise<string | null> {
 
     whichProc.on("close", (code) => {
       if (code === 0 && out.trim().length > 0) {
-        const firstPath = out.trim().split(/\r?\n/)[0];
-        resolve(firstPath);
+        const lines = out.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        if (isWin) {
+          const pathext = (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD")
+            .split(";")
+            .map((e) => e.trim().toLowerCase())
+            .filter(Boolean);
+          for (const ext of pathext) {
+            const hit = lines.find((l) => l.toLowerCase().endsWith(ext));
+            if (hit) {
+              resolve(hit);
+              return;
+            }
+          }
+        }
+        resolve(lines[0]);
       } else {
         resolve(null);
       }
