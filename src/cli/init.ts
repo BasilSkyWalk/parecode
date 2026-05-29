@@ -99,23 +99,34 @@ async function installHook(scope: string, useLinked: boolean): Promise<"installe
   return "installed";
 }
 
-async function installAggressiveHook(scope: string, useLinked: boolean): Promise<"installed" | "already-present"> {
+const DESIRED_PRE_TOOL_USE_MATCHER = "Grep|Glob|Bash";
+
+async function installAggressiveHook(scope: string, useLinked: boolean): Promise<"installed" | "already-present" | "upgraded"> {
   const filepath = resolveSettingsPath(scope);
   const settings = await readSettings(filepath);
   if (!settings.hooks) settings.hooks = {};
   if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
 
   const desiredCommand = preToolUseCommandFor(useLinked);
+  let upgraded = false;
   for (const entry of settings.hooks.PreToolUse) {
     for (const h of entry.hooks ?? []) {
       if (h.type === "command" && matchesPreToolUse(h.command)) {
+        if (entry.matcher !== DESIRED_PRE_TOOL_USE_MATCHER) {
+          entry.matcher = DESIRED_PRE_TOOL_USE_MATCHER;
+          upgraded = true;
+        }
+        if (upgraded) {
+          await writeSettings(filepath, settings);
+          return "upgraded";
+        }
         return "already-present";
       }
     }
   }
 
   settings.hooks.PreToolUse.push({
-    matcher: "Grep|Glob",
+    matcher: DESIRED_PRE_TOOL_USE_MATCHER,
     hooks: [{ type: "command", command: desiredCommand }],
   });
   await writeSettings(filepath, settings);
@@ -309,9 +320,11 @@ export async function initCommand(args: string[]) {
   if (aggressiveHook) {
     const result = await installAggressiveHook(scope, useLinked);
     if (result === "installed") {
-      process.stdout.write(`Installed PreToolUse hook (Grep|Glob → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`Installed PreToolUse hook (Grep|Glob|Bash → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
+    } else if (result === "upgraded") {
+      process.stdout.write(`Upgraded PreToolUse hook matcher to Grep|Glob|Bash at ${resolveSettingsPath(scope)} (was missing Bash — shell grep/rg now redirected).\n`);
     } else {
-      process.stdout.write(`PreToolUse hook already present at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`PreToolUse hook already present (Grep|Glob|Bash) at ${resolveSettingsPath(scope)}.\n`);
     }
   }
 

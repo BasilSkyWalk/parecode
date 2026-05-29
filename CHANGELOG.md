@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.7] — 2026-05-29
+
+### Fixed
+
+- `parecode init --aggressive-hook` previously wrote `matcher: "Grep|Glob"` into `settings.json`, which meant Claude Code never invoked the hook for `Bash` tool calls — so the shell `grep`/`rg` redirect added in 0.4.6 was dead on arrival for users who had already installed the aggressive hook. The matcher is now `"Grep|Glob|Bash"`, and re-running `parecode init --aggressive-hook` will detect a stale matcher and upgrade the existing hook entry in place (new `upgraded` status reported).
+
 ## [0.4.6] — 2026-05-29
 
 ### Added
