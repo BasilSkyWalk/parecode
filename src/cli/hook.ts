@@ -1,11 +1,13 @@
 const SESSION_START_DIRECTIVE =
-  "Parecode is registered in this session. " +
-  "Prefer ParecodeSearch over Grep + Read when you would otherwise read multiple files to inspect match context — " +
-  "it returns only the relevant windows in one call, with per-file chunking that prevents context blowups. " +
-  "Prefer ParecodeEdit over Edit / MultiEdit when (a) editing across multiple files, " +
-  "(b) the exact oldString from a stale read may not match anymore (fuzzy: true tolerates whitespace drift, fuzzy: 'aggressive' normalizes Unicode lookalikes), " +
-  "or (c) you have a batch of related changes. " +
-  "To skip Parecode for one turn, include '#no-parecode' in your request and prefer the native tools.";
+  "Parecode is registered in this session. Two rules:\n\n" +
+  "1. ParecodeSearch over Grep + Read. If you would call Grep and then Read one or more matched files for context, call ParecodeSearch instead — it returns only the relevant windows in a single call, with per-file chunking that prevents context blowups. The same applies to Glob when you actually want to inspect what's inside the matched files.\n\n" +
+  "2. ParecodeEdit over Edit / MultiEdit whenever ANY of the following is true:\n" +
+  "   (a) you are about to make 2 or more edits to the same file (even to a markdown / spec / config file — batching is not a code-only rule),\n" +
+  "   (b) you are editing across multiple files,\n" +
+  "   (c) your oldString was captured from a Read that happened before other edits, so whitespace or line numbers may have drifted (use fuzzy: true; fuzzy: 'aggressive' also normalizes Unicode lookalikes),\n" +
+  "   (d) the changes are logically one revision and should land atomically (ParecodeEdit applies all-or-nothing; a sequence of Edit calls can leave the file half-updated if one fails).\n" +
+  "   Default: if you find yourself planning a second Edit to a file you already edited this turn, the first Edit was the wrong tool — use ParecodeEdit.\n\n" +
+  "Escape hatch: include '#no-parecode' anywhere in your message to skip both rules for that turn and prefer the native tools.";
 
 const GREP_REDIRECT_REASON =
   "Use ParecodeSearch instead — it accepts the same regex pattern, returns matches with surrounding context windows in a single call, and avoids the separate Read steps that follow Grep. " +

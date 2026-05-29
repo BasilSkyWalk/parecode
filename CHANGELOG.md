@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.5] — 2026-05-29
+
+### Changed
+
+- Rewrote the SessionStart hook directive (`parecode hook session-start`) to be more directive and skimmable: two numbered rules, an explicit "2+ edits to the same file" trigger for ParecodeEdit, an atomicity argument, and a clearer escape hatch. Addresses observed cases where models with parecode MCP visible still defaulted to sequential `Edit` calls on a single markdown file.
+
 ## [0.4.4] — 2026-05-29
 
 ### Added
