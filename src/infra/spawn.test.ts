@@ -53,14 +53,14 @@ describe("spawn infra", () => {
 
     vi.mocked(cp.spawn).mockReturnValueOnce(mockProc);
 
-    const resolvePromise = resolveCommand("rg");
+    const resolvePromise = resolveCommand("git");
 
-    mockProc.stdout.emit("data", "C:\\Program Files\\rg.exe\r\nC:\\Windows\\rg.exe\r\n");
+    mockProc.stdout.emit("data", "C:\\Program Files\\git.exe\r\nC:\\Windows\\git.exe\r\n");
     mockProc.emit("close", 0);
 
     const result = await resolvePromise;
-    expect(result).toBe("C:\\Program Files\\rg.exe");
-    expect(cp.spawn).toHaveBeenCalledWith("where", ["rg"]);
+    expect(result).toBe("C:\\Program Files\\git.exe");
+    expect(cp.spawn).toHaveBeenCalledWith("where", ["git"]);
   });
 
   it("prefers a PATHEXT-executable entry over an extensionless wrapper on Windows", async () => {
@@ -87,5 +87,11 @@ describe("spawn infra", () => {
 
     if (prevPathext === undefined) delete process.env.PATHEXT;
     else process.env.PATHEXT = prevPathext;
+  });
+
+  it("returns the bundled @vscode/ripgrep binary for 'rg' without consulting PATH", async () => {
+    const { rgPath } = await import("@vscode/ripgrep");
+    const result = await resolveCommand("rg");
+    expect(result).toBe(rgPath);
   });
 });

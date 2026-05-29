@@ -1,7 +1,24 @@
 import { spawn } from "node:child_process";
+import * as fs from "node:fs/promises";
 import * as os from "node:os";
 
+async function resolveBundledRipgrep(): Promise<string | null> {
+  try {
+    const mod = await import("@vscode/ripgrep");
+    const candidate = mod.rgPath;
+    if (typeof candidate !== "string" || candidate.length === 0) return null;
+    await fs.access(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveCommand(cmd: string): Promise<string | null> {
+  if (cmd === "rg" || cmd === "rg.exe") {
+    const bundled = await resolveBundledRipgrep();
+    if (bundled) return bundled;
+  }
   return new Promise((resolve) => {
     const isWin = os.platform() === "win32";
     const resolverCmd = isWin ? "where" : "which";

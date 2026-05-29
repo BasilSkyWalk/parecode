@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.4] — 2026-05-29
+
+### Added
+
+- Bundled ripgrep via `@vscode/ripgrep`. Users no longer need to install ripgrep separately; the correct prebuilt `rg` for their OS/arch is fetched as an optional dependency at install time. `resolveCommand("rg")` prefers the bundled binary and falls back to PATH if unavailable.
+
 ## [0.4.3] — 2026-05-29
 
 ### Fixed
