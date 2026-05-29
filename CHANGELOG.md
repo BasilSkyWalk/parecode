@@ -17,6 +17,16 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.6] — 2026-05-29
+
+### Added
+
+- PreToolUse hook now intercepts shell search commands run via `Bash` (`grep`, `egrep`, `fgrep`, `rg`, `ripgrep`, including piped forms like `cat foo | grep bar`) and redirects them to ParecodeSearch — closes the gap where models bypassed the existing `Grep` / `Glob` redirect by shelling out instead. Substring matches (e.g. `ls /usr/local/lib/grepkit`) are not flagged.
+
+### Changed
+
+- Strengthened the SessionStart directive's rule #1 to explicitly cover (i) shell grep/rg/ripgrep, (ii) the "same file Read at multiple line ranges in one turn" anti-pattern, and (iii) the "Read a whole file just to find a symbol" anti-pattern.
+
 ## [0.4.5] — 2026-05-29
 
 ### Changed

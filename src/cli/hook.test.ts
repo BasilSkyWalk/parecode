@@ -78,6 +78,39 @@ describe("hookCommand", () => {
       expect(out.hookSpecificOutput.permissionDecision).toBe("allow");
     });
 
+    it("denies Bash grep with a redirect message", async () => {
+      feedStdin(JSON.stringify({ tool_name: "Bash", tool_input: { command: "grep -nE 'foo|bar' src/x.lua" } }));
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+      expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/ParecodeSearch/);
+    });
+
+    it("denies Bash rg / ripgrep", async () => {
+      for (const cmd of ["rg foo src/", "ripgrep --json bar"]) {
+        feedStdin(JSON.stringify({ tool_name: "Bash", tool_input: { command: cmd } }));
+        await hookCommand(["pre-tool-use"]);
+        const out = JSON.parse(stdoutSpy.mock.calls.at(-1)![0] as string);
+        expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+      }
+    });
+
+    it("denies Bash piped grep (cat foo | grep bar)", async () => {
+      feedStdin(JSON.stringify({ tool_name: "Bash", tool_input: { command: "cat src/x.lua | grep -nE foo" } }));
+      await hookCommand(["pre-tool-use"]);
+      const out = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    });
+
+    it("does NOT flag commands that merely contain the substring 'grep'", async () => {
+      for (const cmd of ["ls /usr/local/lib/grepkit", "echo 'no grep here'", "npm ls --depth=0"]) {
+        feedStdin(JSON.stringify({ tool_name: "Bash", tool_input: { command: cmd } }));
+        await hookCommand(["pre-tool-use"]);
+        const out = JSON.parse(stdoutSpy.mock.calls.at(-1)![0] as string);
+        expect(out.hookSpecificOutput.permissionDecision).toBe("allow");
+      }
+    });
+
     it("allows when stdin is empty / malformed", async () => {
       feedStdin("not-json");
       await hookCommand(["pre-tool-use"]);
