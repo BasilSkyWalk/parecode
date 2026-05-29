@@ -35,7 +35,8 @@ export class EditEngine {
         let content = await this.host.readFile(file);
         
         let fileStatus: EditResult["status"] = "success";
-        let fileDetail = `File stat successful: mtimeMs=${stats.mtimeMs}, size=${stats.size}`;
+        let fileDetail = "";
+        let editsApplied = 0;
         let fileConfidence: number | undefined = undefined;
         let fileMatchedText: string | undefined = undefined;
 
@@ -43,6 +44,7 @@ export class EditEngine {
           const count = content.split(edit.oldString).length - 1;
           if (count === 1) {
             content = content.split(edit.oldString).join(edit.newString);
+            editsApplied++;
             continue;
           }
 
@@ -60,6 +62,7 @@ export class EditEngine {
               content = content.substring(0, match.startIndex) + edit.newString + content.substring(match.endIndex);
               fileConfidence = fileConfidence === undefined ? match.confidence : Math.min(fileConfidence, match.confidence);
               fileMatchedText = match.matchedText;
+              editsApplied++;
               continue;
             } else {
               fileStatus = "fuzzy_match_failed";
@@ -80,6 +83,7 @@ export class EditEngine {
             fileDetail = "File modified by another process during edit";
           } else {
             await this.host.writeFile(file, content);
+            fileDetail = editsApplied === 1 ? "1 edit applied" : `${editsApplied} edits applied`;
           }
         }
 

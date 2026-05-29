@@ -39,6 +39,7 @@ Line 21 content to take up space.
       30,
     ],
   ],
+  "omittedLines": 23,
   "patterns": [
     "take",
   ],

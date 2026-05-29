@@ -14,10 +14,13 @@ export interface SearchMatch {
   content: string;
   lineRanges: Array<[number, number]>;
   omittedLineRanges?: Array<[number, number]>;
+  omittedLines?: number;
   patterns: string[];
   estimatedTokens: number;
   relatedSymbols?: string[];
 }
+
+const OMITTED_RANGES_INLINE_CAP = 8;
 
 export interface SearchResult {
   status: "success" | "error";
@@ -126,15 +129,20 @@ export class SearchEngine {
         new Set(mergedWindows.flatMap((w) => Array.from(w.patterns))),
       ).sort();
 
+      const omitted = fr.omittedLineRanges;
+      const omittedLines = omitted
+        ? omitted.reduce((sum, [s, e]) => sum + (e - s + 1), 0)
+        : 0;
+      const includeRanges = omitted && omitted.length > 0 && omitted.length <= OMITTED_RANGES_INLINE_CAP;
+
       const match: SearchMatch = {
         file: fr.file,
         content,
         lineRanges,
         patterns: patternsList,
         estimatedTokens: estimateTokens(content),
-        ...(fr.omittedLineRanges && fr.omittedLineRanges.length > 0
-          ? { omittedLineRanges: fr.omittedLineRanges }
-          : {}),
+        ...(includeRanges ? { omittedLineRanges: omitted } : {}),
+        ...(omittedLines > 0 ? { omittedLines } : {}),
       };
 
       if (args.relatedSymbols) {

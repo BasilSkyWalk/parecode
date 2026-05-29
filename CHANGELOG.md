@@ -17,6 +17,17 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.8] — 2026-05-29
+
+### Fixed
+
+- PreToolUse hook is now registered as **three separate entries** (`matcher: "Grep"`, `"Glob"`, `"Bash"`) instead of one OR'd entry. Observed in production: Claude Code's matcher does not reliably invoke a hook for `Bash` tool calls when the matcher is the regex alternation `Grep|Glob|Bash`, even though that's valid regex syntax. Three single-tool matchers fire deterministically. Re-running `parecode init --aggressive-hook` migrates an existing combined-matcher entry to the new shape and reports `upgraded`.
+
+### Changed
+
+- `ParecodeEdit` response `detail` field on success is now `"N edits applied"` instead of `"File stat successful: mtimeMs=…, size=…"`. The stat string was diagnostic and consumed ~50 tokens per file in a multi-file batch; the new form is actionable and ~5 tokens.
+- `ParecodeSearch` result `omittedLineRanges` is now suppressed when it would contain more than 8 entries (broad searches across long files were emitting 100+ `[start,end]` tuples, dominating the response). The summary field `omittedLines` (total line count) is always emitted when any context was omitted, so the model still knows how much it didn't see — it just doesn't get a wall of range tuples it can't act on.
+
 ## [0.4.7] — 2026-05-29
 
 ### Fixed

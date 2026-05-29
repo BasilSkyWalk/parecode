@@ -33,7 +33,7 @@ describe("EditEngine", () => {
 
     expect(mockHost.statFile).toHaveBeenCalledWith("test.ts");
     expect(result.results[0].status).toBe("success");
-    expect(result.results[0].detail).toContain("mtimeMs=12345");
+    expect(result.results[0].detail).toBe("1 edit applied");
   });
 
   it("should return error status if statFile fails", async () => {

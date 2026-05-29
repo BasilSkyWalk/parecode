@@ -99,7 +99,7 @@ async function installHook(scope: string, useLinked: boolean): Promise<"installe
   return "installed";
 }
 
-const DESIRED_PRE_TOOL_USE_MATCHER = "Grep|Glob|Bash";
+const DESIRED_PRE_TOOL_USE_MATCHERS = ["Grep", "Glob", "Bash"];
 
 async function installAggressiveHook(scope: string, useLinked: boolean): Promise<"installed" | "already-present" | "upgraded"> {
   const filepath = resolveSettingsPath(scope);
@@ -108,29 +108,43 @@ async function installAggressiveHook(scope: string, useLinked: boolean): Promise
   if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
 
   const desiredCommand = preToolUseCommandFor(useLinked);
-  let upgraded = false;
+
+  const existingParecodeMatchers = new Set<string | undefined>();
   for (const entry of settings.hooks.PreToolUse) {
     for (const h of entry.hooks ?? []) {
       if (h.type === "command" && matchesPreToolUse(h.command)) {
-        if (entry.matcher !== DESIRED_PRE_TOOL_USE_MATCHER) {
-          entry.matcher = DESIRED_PRE_TOOL_USE_MATCHER;
-          upgraded = true;
-        }
-        if (upgraded) {
-          await writeSettings(filepath, settings);
-          return "upgraded";
-        }
-        return "already-present";
+        existingParecodeMatchers.add(entry.matcher);
       }
     }
   }
 
-  settings.hooks.PreToolUse.push({
-    matcher: DESIRED_PRE_TOOL_USE_MATCHER,
-    hooks: [{ type: "command", command: desiredCommand }],
-  });
+  const alreadyHasAllSplitEntries =
+    existingParecodeMatchers.size === DESIRED_PRE_TOOL_USE_MATCHERS.length &&
+    DESIRED_PRE_TOOL_USE_MATCHERS.every((m) => existingParecodeMatchers.has(m));
+  if (alreadyHasAllSplitEntries) {
+    return "already-present";
+  }
+
+  const hadAnyParecodeEntry = existingParecodeMatchers.size > 0;
+  const remaining: HookEntry[] = [];
+  for (const entry of settings.hooks.PreToolUse) {
+    const otherHooks = (entry.hooks ?? []).filter(
+      (h) => !(h.type === "command" && matchesPreToolUse(h.command)),
+    );
+    if (otherHooks.length > 0) {
+      remaining.push({ ...entry, hooks: otherHooks });
+    }
+  }
+  settings.hooks.PreToolUse = remaining;
+
+  for (const matcher of DESIRED_PRE_TOOL_USE_MATCHERS) {
+    settings.hooks.PreToolUse.push({
+      matcher,
+      hooks: [{ type: "command", command: desiredCommand }],
+    });
+  }
   await writeSettings(filepath, settings);
-  return "installed";
+  return hadAnyParecodeEntry ? "upgraded" : "installed";
 }
 
 async function removeHook(scope: string): Promise<"removed" | "not-present"> {
@@ -320,11 +334,11 @@ export async function initCommand(args: string[]) {
   if (aggressiveHook) {
     const result = await installAggressiveHook(scope, useLinked);
     if (result === "installed") {
-      process.stdout.write(`Installed PreToolUse hook (Grep|Glob|Bash → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`Installed PreToolUse hooks (Grep, Glob, Bash — three separate entries → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
     } else if (result === "upgraded") {
-      process.stdout.write(`Upgraded PreToolUse hook matcher to Grep|Glob|Bash at ${resolveSettingsPath(scope)} (was missing Bash — shell grep/rg now redirected).\n`);
+      process.stdout.write(`Upgraded PreToolUse hooks to three separate entries (Grep, Glob, Bash) at ${resolveSettingsPath(scope)} (Claude Code's matcher doesn't reliably accept regex alternation for tool names).\n`);
     } else {
-      process.stdout.write(`PreToolUse hook already present (Grep|Glob|Bash) at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`PreToolUse hooks already present (Grep, Glob, Bash) at ${resolveSettingsPath(scope)}.\n`);
     }
   }
 

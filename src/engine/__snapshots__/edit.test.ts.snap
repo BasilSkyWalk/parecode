@@ -5,7 +5,7 @@ exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with
   "results": [
     {
       "confidence": 1,
-      "detail": "File stat successful: mtimeMs=123, size=456",
+      "detail": "2 edits applied",
       "file": "test.ts",
       "matchedText": "const b = "résumé";",
       "status": "success",
@@ -37,7 +37,7 @@ exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with
   "results": [
     {
       "confidence": 1,
-      "detail": "File stat successful: mtimeMs=123, size=456",
+      "detail": "1 edit applied",
       "file": "test.ts",
       "matchedText": "function    hello  (  )   {
 
