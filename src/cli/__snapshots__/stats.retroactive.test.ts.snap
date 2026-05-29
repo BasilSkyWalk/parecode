@@ -3,11 +3,14 @@
 exports[`statsCommand --retroactive integration > prints retroactive stats correctly using real fixtures 1`] = `
 "Parecode — last 10000d (retroactive scan)
 ─────────────────────
-Sessions:                    2
-Tool calls:                  5
-Calls batched (est):         0
-Tokens saved (est):        840
+Sessions:                         2
+Tool calls:                       5
+Calls batched (est):              0
+Tokens saved (lower-bound est):   280
 
-* Note: Retroactive savings are estimated, not measured.
+* Lower-bound assumes a realistic baseline (model would do targeted reads,
+  not full-file reads). Pass --upper-bound for the naive "Read every matched
+  file in full" counterfactual (~3× larger).
+* Retroactive savings are estimated, not measured.
 "
 `;

@@ -3,12 +3,15 @@ import envPaths from "env-paths";
 import { loadRollupWithInflight } from "../stats/tracker.js";
 import { runRetroactiveScan } from "../stats/retroactiveScan.js";
 
+const UPPER_BOUND_OVERESTIMATE_FACTOR = 3;
+
 export async function statsCommand(args: string[]) {
   let sinceStr = "7d";
   let outputJson = false;
   let retroactive = false;
   let writeSnapshot = false;
   let includeContent = false;
+  let showUpperBound = false;
 
   const durationPattern = /^(\d+)(d|h|m|s)$/;
   for (let i = 0; i < args.length; i++) {
@@ -23,8 +26,8 @@ export async function statsCommand(args: string[]) {
       writeSnapshot = true;
     } else if (args[i] === "--include-content") {
       includeContent = true;
-      // Default to 30d if --retroactive is used and --since hasn't been parsed yet.
-      // We will re-apply the 30d default below if sinceStr is still 7d.
+    } else if (args[i] === "--upper-bound") {
+      showUpperBound = true;
     } else if (durationPattern.test(args[i])) {
       sinceStr = args[i];
     }
@@ -86,24 +89,34 @@ export async function statsCommand(args: string[]) {
     }
   }
 
+  const tokensSavedLowerBound = Math.round(totalEstimatedTokensSaved / UPPER_BOUND_OVERESTIMATE_FACTOR);
+  const tokensSavedShown = showUpperBound ? totalEstimatedTokensSaved : tokensSavedLowerBound;
+  const tokensSavedLabel = showUpperBound ? "Tokens saved (upper-bound est):" : "Tokens saved (lower-bound est):";
+
   if (outputJson) {
     process.stdout.write(JSON.stringify({
       sessions: totalSessions,
       toolCalls: totalCalls,
       callsBatched: totalCallsBatched,
-      estimatedTokensSaved: totalEstimatedTokensSaved,
+      estimatedTokensSavedLowerBound: tokensSavedLowerBound,
+      estimatedTokensSavedUpperBound: totalEstimatedTokensSaved,
       since: sinceStr,
       ...(retroactive ? { retroactive: true } : {})
     }, null, 2) + "\n");
   } else {
     process.stdout.write(`Parecode — last ${sinceStr}${retroactive ? " (retroactive scan)" : ""}\n`);
     process.stdout.write(`─────────────────────\n`);
-    process.stdout.write(`Sessions:               ${totalSessions.toLocaleString().padStart(6)}\n`);
-    process.stdout.write(`Tool calls:             ${totalCalls.toLocaleString().padStart(6)}\n`);
-    process.stdout.write(`Calls batched (est):    ${totalCallsBatched.toLocaleString().padStart(6)}\n`);
-    process.stdout.write(`Tokens saved (est):     ${totalEstimatedTokensSaved.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`Sessions:                    ${totalSessions.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`Tool calls:                  ${totalCalls.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`Calls batched (est):         ${totalCallsBatched.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`${tokensSavedLabel.padEnd(29)}${tokensSavedShown.toLocaleString().padStart(6)}\n`);
+    if (!showUpperBound) {
+      process.stdout.write(`\n* Lower-bound assumes a realistic baseline (model would do targeted reads,\n`);
+      process.stdout.write(`  not full-file reads). Pass --upper-bound for the naive "Read every matched\n`);
+      process.stdout.write(`  file in full" counterfactual (~${UPPER_BOUND_OVERESTIMATE_FACTOR}× larger).\n`);
+    }
     if (retroactive) {
-      process.stdout.write(`\n* Note: Retroactive savings are estimated, not measured.\n`);
+      process.stdout.write(`* Retroactive savings are estimated, not measured.\n`);
     }
   }
 }

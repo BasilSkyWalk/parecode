@@ -81,7 +81,7 @@ describe("initCommand --with-hook / --remove-hook", () => {
       "utf-8",
     );
 
-    await initCommand(["--scope", "user", "--with-hook"]);
+    await initCommand(["--scope", "user", "--with-hook", "--no-aggressive-hook"]);
 
     const settings = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
     expect(settings.theme).toBe("dark");

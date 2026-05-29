@@ -187,7 +187,8 @@ export async function initCommand(args: string[]) {
   let useLinked = false;
   let withHook = true;
   let hookExplicitlySet = false;
-  let aggressiveHook = false;
+  let aggressiveHook = true;
+  let aggressiveHookExplicitlySet = false;
   let removeHookOnly = false;
   let withPlugin = true;
   let pluginExplicitlySet = false;
@@ -211,6 +212,10 @@ export async function initCommand(args: string[]) {
       withHook = true;
       aggressiveHook = true;
       hookExplicitlySet = true;
+      aggressiveHookExplicitlySet = true;
+    } else if (args[i] === "--no-aggressive-hook") {
+      aggressiveHook = false;
+      aggressiveHookExplicitlySet = true;
     } else if (args[i] === "--remove-hook") {
       removeHookOnly = true;
     } else if (args[i] === "--with-plugin") {
@@ -276,8 +281,8 @@ export async function initCommand(args: string[]) {
     if (withHook) {
       process.stdout.write(`# Would also install SessionStart hook in ${resolveSettingsPath(scope)} running: ${sessionStartCommandFor(useLinked)}\n`);
     }
-    if (aggressiveHook) {
-      process.stdout.write(`# Would also install PreToolUse hook (Grep|Glob) running: ${preToolUseCommandFor(useLinked)}\n`);
+    if (withHook && aggressiveHook) {
+      process.stdout.write(`# Would also install PreToolUse hooks (Grep, Glob, Bash — three separate entries) running: ${preToolUseCommandFor(useLinked)}\n`);
     }
     if (withPlugin) {
       process.stdout.write(`# Would ensure Parecode marketplace via: claude plugin marketplace add ${getMarketplaceSource(useLinked)}\n`);
@@ -331,10 +336,11 @@ export async function initCommand(args: string[]) {
     }
   }
 
-  if (aggressiveHook) {
+  if (withHook && aggressiveHook) {
     const result = await installAggressiveHook(scope, useLinked);
+    const aggSuffix = aggressiveHookExplicitlySet ? "" : " (default as of 0.4.9; pass --no-aggressive-hook to opt out)";
     if (result === "installed") {
-      process.stdout.write(`Installed PreToolUse hooks (Grep, Glob, Bash — three separate entries → ParecodeSearch) at ${resolveSettingsPath(scope)}.\n`);
+      process.stdout.write(`Installed PreToolUse hooks (Grep, Glob, Bash — three separate entries → ParecodeSearch) at ${resolveSettingsPath(scope)}${aggSuffix}.\n`);
     } else if (result === "upgraded") {
       process.stdout.write(`Upgraded PreToolUse hooks to three separate entries (Grep, Glob, Bash) at ${resolveSettingsPath(scope)} (Claude Code's matcher doesn't reliably accept regex alternation for tool names).\n`);
     } else {

@@ -17,6 +17,13 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.9] — 2026-05-29
+
+### Changed
+
+- **PreToolUse aggressive hook is now installed by default** by `parecode init`. The previous opt-in default produced an install that "worked" (MCP visible, soft directive present) but in practice models still defaulted to native `Grep` / `Bash grep`, defeating most of the value. Pass `--no-aggressive-hook` to opt out (parallel to existing `--no-hook` / `--no-plugin` flags). The `--aggressive-hook` flag remains a no-op accepted for backward compatibility.
+- **`parecode stats` default output is now a lower-bound estimate** rather than the previous upper-bound counterfactual ("model would have Read every matched file in full"). Real model behavior is closer to targeted reads, so the upper-bound number overstated savings by ~3×. Pass `--upper-bound` to see the old number; the `--json` output now emits both `estimatedTokensSavedLowerBound` and `estimatedTokensSavedUpperBound`. A short methodology note is printed by default to keep the framing honest.
+
 ## [0.4.8] — 2026-05-29
 
 ### Fixed
