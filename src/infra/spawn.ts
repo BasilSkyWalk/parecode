@@ -46,13 +46,23 @@ export interface SpawnResult {
   code: number | null;
 }
 
+function quoteWindowsArg(arg: string): string {
+  if (arg.length === 0) return '""';
+  if (!/[\s"&|<>^()%!]/.test(arg)) return arg;
+  return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
+}
+
 export async function spawnCommand(
   cmd: string,
   args: string[],
   cwd?: string
 ): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd, shell: false });
+    const isWin = os.platform() === "win32";
+    const needsShell = isWin && /\.(cmd|bat)$/i.test(cmd);
+    const finalCmd = needsShell ? `"${cmd}" ${args.map(quoteWindowsArg).join(" ")}` : cmd;
+    const finalArgs = needsShell ? [] : args;
+    const proc = spawn(finalCmd, finalArgs, { cwd, shell: needsShell });
     
     let stdout = "";
     let stderr = "";

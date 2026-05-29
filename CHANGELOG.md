@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.3] — 2026-05-29
+
+### Fixed
+
+- `parecode init` on Windows still failed with `spawn EINVAL` on Node 20.12.2+ when invoking `claude.cmd` (CVE-2024-27980 hardening blocks `.cmd`/`.bat` with `shell: false`). `spawnCommand` now invokes `.cmd`/`.bat` via `shell: true` with arguments quoted for `cmd.exe`.
+
 ## [0.4.2] — 2026-05-29
 
 ### Fixed
