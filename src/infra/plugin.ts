@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,4 +46,36 @@ export function parsePluginListing(listStdout: string): PluginListingDetails | n
     }
   }
   return null;
+}
+
+export async function readBundledPluginVersion(): Promise<string | null> {
+  const dir = getLocalMarketplaceDir();
+  const pluginJsonPath = path.join(dir, "plugins", "claude-code", ".claude-plugin", "plugin.json");
+  try {
+    const raw = await fs.readFile(pluginJsonPath, "utf-8");
+    const parsed = JSON.parse(raw) as { version?: unknown };
+    return typeof parsed.version === "string" ? parsed.version : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseSemverParts(value: string): number[] | null {
+  const match = value.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return null;
+  return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
+}
+
+export function shouldUpgradePlugin(installed: string, bundled: string): boolean {
+  if (!installed || installed === "unknown") return false;
+  if (!bundled) return false;
+  if (installed === bundled) return false;
+  const a = parseSemverParts(installed);
+  const b = parseSemverParts(bundled);
+  if (!a || !b) return installed !== bundled;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] < b[i]) return true;
+    if (a[i] > b[i]) return false;
+  }
+  return false;
 }

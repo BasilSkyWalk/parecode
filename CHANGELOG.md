@@ -17,6 +17,13 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.11] — 2026-05-30
+
+### Fixed
+
+- **Plugin version was pinned at `0.4.0` in `plugins/claude-code/.claude-plugin/plugin.json` and never bumped.** Users on any later CLI release were silently running the 0.4.0 plugin, which is missing the aggressive PreToolUse routing reminder added in 0.4.8/0.4.9. Observed in production: a session with 76 assistant turns made only 3 Parecode tool calls because the model wasn't being steered toward `ParecodeSearch` / `ParecodeEdit`. Plugin version now tracks `package.json` and a new test fails CI on drift.
+- **`parecode init` no longer no-ops when a stale plugin is installed.** Previously the install branch short-circuited on `isPluginInstalled`, leaving an old plugin in place forever. Now it parses the installed version, compares to the bundled version, and on mismatch performs an uninstall + reinstall. `parecode doctor` also surfaces a `STALE` note when versions diverge so users can see the drift before it bites.
+
 ## [0.4.10] — 2026-05-30
 
 ### Added

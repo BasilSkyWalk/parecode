@@ -8,7 +8,7 @@ import envPaths from "env-paths";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 import { transcriptDirExists, resolveTranscriptDir, listProjectDirs, listSessionFiles } from "../infra/claudeCodeTranscripts.js";
 import { parseTranscriptLine } from "../stats/transcriptParser.js";
-import { parsePluginListing } from "../infra/plugin.js";
+import { parsePluginListing, readBundledPluginVersion, shouldUpgradePlugin } from "../infra/plugin.js";
 
 async function getDirSize(dirPath: string): Promise<number> {
   let size = 0;
@@ -162,13 +162,18 @@ export async function doctorCommand() {
 
     const listResult = await spawnCommand(claudePath, ["plugin", "list"]);
     let pluginStatus = "Not registered";
+    let staleNote = "";
     if (listResult.code === 0) {
       const details = parsePluginListing(listResult.stdout);
       if (details) {
         pluginStatus = `Installed (scope: ${details.scope}, version: ${details.version})`;
+        const bundled = await readBundledPluginVersion();
+        if (bundled && shouldUpgradePlugin(details.version, bundled)) {
+          staleNote = `\n               STALE: bundled plugin is ${bundled}. Run 'parecode init' to upgrade.`;
+        }
       }
     }
-    process.stdout.write(`Plugin Status: ${pluginStatus}\n`);
+    process.stdout.write(`Plugin Status: ${pluginStatus}${staleNote}\n`);
   } else {
     process.stdout.write(`MCP Status:    Claude CLI not found on PATH\n`);
     process.stdout.write(`Plugin Status: Claude CLI not found on PATH\n`);

@@ -8,6 +8,9 @@ import {
   getMarketplaceSource,
   isPluginInstalled,
   isMarketplaceAdded,
+  parsePluginListing,
+  readBundledPluginVersion,
+  shouldUpgradePlugin,
 } from "../infra/plugin.js";
 
 interface HookEntry {
@@ -382,7 +385,25 @@ export async function initCommand(args: string[]) {
       if (pluginList.code !== 0) {
         pluginAborted = fail("Failed to list Claude plugins", pluginList.stderr || pluginList.stdout);
       } else if (isPluginInstalled(pluginList.stdout)) {
-        process.stdout.write(`Parecode plugin already installed.\n`);
+        const installedDetails = parsePluginListing(pluginList.stdout);
+        const bundledVersion = await readBundledPluginVersion();
+        const installedVersion = installedDetails?.version ?? "unknown";
+        if (bundledVersion && shouldUpgradePlugin(installedVersion, bundledVersion)) {
+          process.stdout.write(`Parecode plugin is stale (installed: ${installedVersion}, bundled: ${bundledVersion}) — upgrading.\n`);
+          const uninstallResult = await spawnCommand(claudePath, ["plugin", "uninstall", PARECODE_PLUGIN_ID, "-s", scope]);
+          if (uninstallResult.code !== 0) {
+            pluginAborted = fail("Failed to uninstall stale Parecode plugin", uninstallResult.stderr || uninstallResult.stdout);
+          } else {
+            const installResult = await spawnCommand(claudePath, ["plugin", "install", `${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME}`, "-s", scope]);
+            if (installResult.code !== 0) {
+              pluginAborted = fail("Failed to reinstall Parecode plugin", installResult.stderr || installResult.stdout);
+            } else {
+              process.stdout.write(`Upgraded Parecode plugin to ${bundledVersion} (scope: ${scope}).\n`);
+            }
+          }
+        } else {
+          process.stdout.write(`Parecode plugin already installed (version: ${installedVersion}).\n`);
+        }
       } else {
         const installResult = await spawnCommand(claudePath, ["plugin", "install", `${PARECODE_PLUGIN_ID}@${PARECODE_MARKETPLACE_NAME}`, "-s", scope]);
         if (installResult.code !== 0) {
