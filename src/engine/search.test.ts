@@ -160,7 +160,7 @@ describe("SearchEngine", () => {
     const result = await engine.search({ pattern: "x" });
 
     const expected = result.matches!.reduce(
-      (sum, m) => sum + Math.ceil(m.content.length / 4),
+      (sum, m) => sum + Math.ceil((m.content ?? "").length / 4),
       0,
     );
 
@@ -273,7 +273,7 @@ describe("SearchEngine", () => {
   });
 
   describe("v0.2: token estimates", () => {
-    it("attaches per-match estimatedTokens and a response-level estimatedTokens", async () => {
+    it("attaches a response-level estimatedTokens", async () => {
       const stdout = toRgJson([
         { type: "match", file: "a.ts", line: 1, text: "alpha\n" },
         { type: "match", file: "b.ts", line: 1, text: "beta\n" },
@@ -286,11 +286,7 @@ describe("SearchEngine", () => {
       const result = await engine.search({ pattern: "x" });
 
       expect(result.matches).toHaveLength(2);
-      for (const m of result.matches!) {
-        expect(m.estimatedTokens).toBe(Math.ceil(m.content.length / 4));
-      }
-      const perMatch = result.matches!.reduce((s, m) => s + m.estimatedTokens, 0);
-      expect(result.estimatedTokens).toBeGreaterThan(perMatch);
+      expect(result.estimatedTokens).toBeGreaterThan(0);
     });
 
     it("response-level estimatedTokens scales with envelope size", async () => {
@@ -544,38 +540,58 @@ describe("SearchEngine", () => {
     });
   });
 
-  describe("recommendation", () => {
-    it("omits recommendation when result is small", async () => {
-      const events: RgEvent[] = [
-        { type: "match", file: "tiny.ts", line: 1, text: "small\n" },
-      ];
+  describe("v0.5: brief search", () => {
+    it("omits content for matches whose own size exceeds INLINE_THRESHOLD (2KB)", async () => {
+      const heavyLine = "x".repeat(2100) + "\n";
+      const stdout = toRgJson([
+        { type: "match", file: "a.ts", line: 1, text: heavyLine },
+        { type: "match", file: "b.ts", line: 1, text: heavyLine },
+        { type: "match", file: "c.ts", line: 1, text: heavyLine },
+      ]);
       const host = makeHost({
-        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
-      });
-      const engine = new SearchEngine(host);
-
-      const result = await engine.search({ pattern: "small" });
-
-      expect(result.status).toBe("success");
-      expect(result.recommendation).toBeUndefined();
-    });
-
-    it("includes a recommendation when result exceeds the token threshold", async () => {
-      const events: RgEvent[] = [];
-      const heavyLine = "x".repeat(200) + "\n";
-      for (let i = 1; i <= 100; i++) {
-        events.push({ type: "match", file: `huge${i}.ts`, line: i, text: heavyLine });
-      }
-      const host = makeHost({
-        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
       });
       const engine = new SearchEngine(host);
 
       const result = await engine.search({ pattern: "x" });
 
       expect(result.status).toBe("success");
-      expect(result.recommendation).toBeDefined();
-      expect(result.recommendation).toMatch(/Haiku|narrow/i);
+      for (const m of result.matches!) {
+        expect(m.content).toBeUndefined();
+        expect(m.omittedLineRanges).toContainEqual([1, 1]);
+      }
+    });
+
+    it("inlines small matches even when a sibling match is omitted", async () => {
+      const heavyLine = "x".repeat(2100) + "\n";
+      const stdout = toRgJson([
+        { type: "match", file: "big.ts", line: 1, text: heavyLine },
+        { type: "match", file: "small.ts", line: 1, text: "hit\n" },
+      ]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      const big = result.matches!.find((m) => m.file === "big.ts")!;
+      const small = result.matches!.find((m) => m.file === "small.ts")!;
+      expect(big.content).toBeUndefined();
+      expect(small.content).toBe("hit\n");
+    });
+
+    it("includes content when a match size is within INLINE_THRESHOLD", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hit\n" }]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "hit" });
+
+      expect(result.status).toBe("success");
+      expect(result.matches![0].content).toBe("hit\n");
     });
   });
 });

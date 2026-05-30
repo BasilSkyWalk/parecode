@@ -3,25 +3,10 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeSearchToolSpec: ToolSpec = {
   name: "ParecodeSearch",
   description:
-    "Search the codebase with ripgrep and return matches with surrounding context in a single call. " +
-    "Strongly prefer this over chained `find` / `xargs grep` / `grep -R` plus a follow-up Read: " +
-    "ParecodeSearch returns only the relevant windows tagged with per-match estimatedTokens, so you " +
-    "can budget the response before consuming it (skip matches with disproportionate estimatedTokens " +
-    "unless you need them). " +
-    "Pass `pattern` as an array of strings to dispatch parallel ripgrep runs sharing the same paths " +
-    "and context — this is the right move for related-keyword flow tracing (e.g. " +
-    "['HandleX', 'OnX', 'XClosed']) and replaces N back-to-back ParecodeSearch calls with one. " +
-    "Each match reports `patterns: string[]` listing which input patterns contributed. " +
-    "Overlapping or adjacent windows within the same file are merged automatically (gap ≤ contextLines). " +
-    "Use for: 'find all callers of X', 'locate the definition of Y', 'trace this event flow across the repo'. " +
-    "When CodeGraph is initialised in the repo (.codegraph/ present), prefer `codegraph_explore` for " +
-    "broad 'how does X work?' questions; ParecodeSearch is still the right tool for targeted " +
-    "multi-pattern lookups and for repos without CodeGraph. " +
-    "Set `relatedSymbols: true` to surface likely event-flow neighbours (Handle<X>, On<X>, <X>Handler, " +
-    "<X>Listener, <X>Closed/Completed/Started) discovered in each match — opt-in, capped per match. " +
-    "Per-file chunking via maxBytesPerFile prevents context blowups; omitted ranges are reported in " +
-    "omittedLineRanges so you can widen with ParecodeExpand without re-reading the whole file. " +
-    "Supports regex patterns and optional path scoping.",
+    "Search the codebase with ripgrep and return matches with context in a single call. " +
+    "Prefer over native grep/find for targeted multi-pattern lookups or when needing context windows. " +
+    "Results ≤ 2KB are auto-inlined; larger results return locations only to be widened " +
+    "via ParecodeExpand. Supports regex and path scoping.",
   inputSchema: {
     type: "object",
     properties: {

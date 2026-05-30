@@ -33,7 +33,7 @@ describe("EditEngine", () => {
 
     expect(mockHost.statFile).toHaveBeenCalledWith("test.ts");
     expect(result.results[0].status).toBe("success");
-    expect(result.results[0].detail).toBe("1 edit applied");
+    expect(result.results[0].detail).toBe("1 edits applied");
   });
 
   it("should return error status if statFile fails", async () => {
@@ -119,7 +119,8 @@ describe("EditEngine", () => {
 
     expect(mockHost.writeFile).not.toHaveBeenCalled();
     expect(result.results[0].status).toBe("error");
-    expect(result.results[0].detail).toContain("Exact match not found");
+    expect(result.results[0].opResults?.[0].status).toBe("error");
+    expect(result.results[0].opResults?.[0].detail).toContain("Exact match not found");
   });
 
   it("should return error if exact match has multiple occurrences", async () => {
@@ -148,7 +149,7 @@ describe("EditEngine", () => {
 
     expect(mockHost.writeFile).not.toHaveBeenCalled();
     expect(result.results[0].status).toBe("error");
-    expect(result.results[0].detail).toContain("Multiple occurrences of exact match found");
+    expect(result.results[0].opResults?.[0].detail).toContain("Multiple occurrences of exact match found");
   });
 
   it("should apply fuzzy match successfully if enabled", async () => {
@@ -178,8 +179,8 @@ describe("EditEngine", () => {
 
     expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "const a = 42;\nconst b = 2;\n");
     expect(result.results[0].status).toBe("success");
-    expect(result.results[0].confidence).toBe(1.0);
-    expect(result.results[0].matchedText).toBe("const   a  = \n 1;");
+    expect(result.results[0].opResults?.[0].confidence).toBe(1.0);
+    expect(result.results[0].opResults?.[0].matchedText).toBe("const   a  = \n 1;");
   });
 
   it("should fail closed if fuzzy match confidence is too low", async () => {
@@ -211,7 +212,7 @@ describe("EditEngine", () => {
     expect(result.results[0].status).toBe("fuzzy_match_failed");
   });
 
-  it("should process multiple edits in the same file sequentially and write once", async () => {
+  it("should process multiple edits in the same file and write once", async () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
@@ -296,6 +297,180 @@ describe("EditEngine", () => {
     
     expect(mockHost.writeFile).toHaveBeenCalledTimes(1);
     expect(mockHost.writeFile).toHaveBeenCalledWith("test2.ts", "let c = 30;\n");
+  });
+
+  describe("line-range operations", () => {
+    it("should apply replaceLines successfully", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("L1\nL2\nL3\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            replaceLines: [1, 2],
+            content: "NEW1\nNEW2",
+            expect: "L1\n…\nL2"
+          }
+        ]
+      });
+
+      expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "NEW1\nNEW2\nL3\n");
+      expect(result.results[0].status).toBe("success");
+    });
+
+    it("should apply insertAfter successfully", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("L1\nL2\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            insertAfter: 1,
+            content: "INS",
+            expect: "L1"
+          }
+        ]
+      });
+
+      expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "L1\nINS\nL2\n");
+      expect(result.results[0].status).toBe("success");
+    });
+
+    it("should apply insertAfter: 0 at the top of file", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("L1\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            insertAfter: 0,
+            content: "TOP",
+            expect: ""
+          }
+        ]
+      });
+
+      expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "TOP\nL1\n");
+      expect(result.results[0].status).toBe("success");
+    });
+
+    it("should return snippet_mismatch if expect fails", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("L1\nL2\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            insertAfter: 1,
+            content: "INS",
+            expect: "WRONG"
+          }
+        ]
+      });
+
+      expect(mockHost.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
+    });
+
+    it("should reject overlapping line edits in the same file without writing", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("L1\nL2\nL3\nL4\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          { file: "test.ts", replaceLines: [1, 2], content: "A", expect: "L1\n…\nL2" },
+          { file: "test.ts", replaceLines: [2, 3], content: "B", expect: "L2\n…\nL3" }
+        ]
+      });
+
+      expect(mockHost.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("error");
+      expect(result.results[0].detail).toContain("Overlapping");
+    });
+
+    it("should fuzzy-locate expect if exact match fails", async () => {
+      const mockHost: ToolHost = {
+        registerTool: vi.fn(),
+        dispatchSubagent: vi.fn(),
+        readFile: vi.fn().mockResolvedValue("EXTRA\nEXTRA\nL1\nL2\n"),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        recordStat: vi.fn(),
+        exec: vi.fn(),
+        resolveCommand: vi.fn(),
+        statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+      };
+
+      const engine = new EditEngine(mockHost);
+      const result = await engine.edit({
+        edits: [
+          {
+            file: "test.ts",
+            insertAfter: 1,
+            content: "INS",
+            expect: "L1"
+          }
+        ]
+      });
+
+      expect(mockHost.writeFile).toHaveBeenCalledWith("test.ts", "EXTRA\nEXTRA\nL1\nINS\nL2\n");
+      expect(result.results[0].status).toBe("success");
+      expect(result.results[0].opResults?.[0].confidence).toBeDefined();
+    });
   });
 
   it("should return conflict if file is modified between read and write", async () => {
@@ -448,11 +623,11 @@ describe("EditEngine", () => {
       await cleanup();
     });
 
-    it("should serialize two edits to the same file in one batch (second edit depends on first)", async () => {
+    it("should serialize two edits to the same file in one batch", async () => {
       const { path: dirPath, cleanup } = await dir({ unsafeCleanup: true });
       const filePath = path.join(dirPath, "test.txt");
       
-      const originalContent = "let a = 1;\n";
+      const originalContent = "let a = 1;\nlet b = 2;\n";
       await fs.writeFile(filePath, originalContent, "utf-8");
       
       let writeCount = 0;
@@ -489,8 +664,8 @@ describe("EditEngine", () => {
           },
           {
             file: filePath,
-            oldString: "let a = 10;",
-            newString: "let a = 100;"
+            oldString: "let b = 2;",
+            newString: "let b = 20;"
           }
         ]
       });
@@ -499,7 +674,7 @@ describe("EditEngine", () => {
       expect(result.results[0].status).toBe("success");
       
       const finalContent = await fs.readFile(filePath, "utf-8");
-      expect(finalContent).toBe("let a = 100;\n");
+      expect(finalContent).toBe("let a = 10;\nlet b = 20;\n");
       
       expect(readCount).toBe(1);
       expect(writeCount).toBe(1);

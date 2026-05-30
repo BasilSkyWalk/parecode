@@ -9,18 +9,24 @@ export interface SearchArgs {
   relatedSymbols?: boolean;
 }
 
+export interface SearchHit {
+  line: number;
+  matchText: string;
+}
+
 export interface SearchMatch {
   file: string;
-  content: string;
+  hits: SearchHit[];
+  content?: string;
   lineRanges: Array<[number, number]>;
   omittedLineRanges?: Array<[number, number]>;
   omittedLines?: number;
   patterns: string[];
-  estimatedTokens: number;
   relatedSymbols?: string[];
 }
 
 const OMITTED_RANGES_INLINE_CAP = 8;
+const INLINE_THRESHOLD = 2048;
 
 export interface SearchResult {
   status: "success" | "error";
@@ -28,7 +34,6 @@ export interface SearchResult {
   matches?: SearchMatch[];
   errors?: Array<{ pattern: string; detail: string }>;
   estimatedTokens?: number;
-  recommendation?: string;
 }
 
 interface SearchWindow {
@@ -41,6 +46,7 @@ interface SearchWindow {
 interface FileResult {
   file: string;
   windows: SearchWindow[];
+  hits: SearchHit[];
   omittedLineRanges?: Array<[number, number]>;
 }
 
@@ -53,7 +59,6 @@ export interface MergePlan {
   groups: number[][];
 }
 
-const LARGE_RESULT_TOKEN_THRESHOLD = 4000;
 const RELATED_SYMBOL_CAP = 10;
 const MIN_SYMBOL_LENGTH = 4;
 
@@ -94,12 +99,12 @@ export class SearchEngine {
           perFile.set(file, {
             file,
             windows: fr.windows.map((w) => ({ ...w, patterns: new Set(w.patterns) })),
+            hits: [...fr.hits],
             omittedLineRanges: fr.omittedLineRanges ? [...fr.omittedLineRanges] : undefined,
           });
         } else {
-          existing.windows.push(
-            ...fr.windows.map((w) => ({ ...w, patterns: new Set(w.patterns) })),
-          );
+          existing.windows.push(...fr.windows.map((w) => ({ ...w, patterns: new Set(w.patterns) })));
+          existing.hits.push(...fr.hits);
           if (fr.omittedLineRanges) {
             existing.omittedLineRanges = mergeRanges(existing.omittedLineRanges, fr.omittedLineRanges);
           }
@@ -118,6 +123,7 @@ export class SearchEngine {
     const sourceSymbols = args.relatedSymbols ? extractSourceSymbols(patterns) : [];
 
     const matches: SearchMatch[] = [];
+
     for (const fr of perFile.values()) {
       fr.windows.sort((a, b) => a.startLine - b.startLine);
       const plan = planMerges(fr.windows, ctx);
@@ -125,22 +131,29 @@ export class SearchEngine {
 
       const lineRanges: Array<[number, number]> = mergedWindows.map((w) => [w.startLine, w.endLine]);
       const content = mergedWindows.map((w) => w.content).join("\n---\n\n");
-      const patternsList = Array.from(
-        new Set(mergedWindows.flatMap((w) => Array.from(w.patterns))),
-      ).sort();
+
+      const patternsList = Array.from(new Set(mergedWindows.flatMap((w) => Array.from(w.patterns)))).sort();
 
       const omitted = fr.omittedLineRanges;
-      const omittedLines = omitted
-        ? omitted.reduce((sum, [s, e]) => sum + (e - s + 1), 0)
-        : 0;
+      const omittedLines = omitted ? omitted.reduce((sum, [s, e]) => sum + (e - s + 1), 0) : 0;
       const includeRanges = omitted && omitted.length > 0 && omitted.length <= OMITTED_RANGES_INLINE_CAP;
+
+      const seenHits = new Set<string>();
+      const hits = fr.hits
+        .filter((h) => {
+          const k = `${h.line}:${h.matchText}`;
+          if (seenHits.has(k)) return false;
+          seenHits.add(k);
+          return true;
+        })
+        .sort((a, b) => a.line - b.line);
 
       const match: SearchMatch = {
         file: fr.file,
+        hits,
         content,
         lineRanges,
         patterns: patternsList,
-        estimatedTokens: estimateTokens(content),
         ...(includeRanges ? { omittedLineRanges: omitted } : {}),
         ...(omittedLines > 0 ? { omittedLines } : {}),
       };
@@ -150,6 +163,14 @@ export class SearchEngine {
       }
 
       matches.push(match);
+    }
+
+    for (const match of matches) {
+      const matchBytes = match.content ? Buffer.byteLength(match.content, "utf8") : 0;
+      if (matchBytes > INLINE_THRESHOLD) {
+        match.omittedLineRanges = mergeRanges(match.omittedLineRanges, match.lineRanges);
+        delete match.content;
+      }
     }
 
     let estimatedNativeTokens = 0;
@@ -162,9 +183,12 @@ export class SearchEngine {
       }),
     );
 
-    const estimatedTokensTotal = estimateSearchEnvelopeTokens(matches, errors);
+    const estimatedTokensTotal = estimateSearchEnvelopeTokens(
+      matches.map((m) => ({ ...m, estimatedTokens: m.content ? estimateTokens(m.content) : 0 })),
+      errors,
+    );
 
-    const actualTokens = matches.reduce((s, m) => s + m.estimatedTokens, 0);
+    const actualTokens = matches.reduce((s, m) => s + (m.content ? estimateTokens(m.content) : 0), 0);
 
     this.host.recordStat({
       toolCall: "ParecodeSearch",
@@ -176,17 +200,11 @@ export class SearchEngine {
       callsBatched: matches.length,
     });
 
-    const isLargeResult = actualTokens > LARGE_RESULT_TOKEN_THRESHOLD;
-    const recommendation = isLargeResult
-      ? "Result is large. Consider narrowing 'paths', tightening the pattern, or dispatching a Haiku Task subagent to extract just the relevant section before consuming the full content."
-      : undefined;
-
     return {
       status: "success",
       matches,
       ...(errors.length > 0 ? { errors } : {}),
       estimatedTokens: estimatedTokensTotal,
-      ...(recommendation ? { recommendation } : {}),
     };
   }
 
@@ -209,7 +227,7 @@ export class SearchEngine {
     }
 
     const lines = stdout.split("\n").filter(Boolean);
-    const fileMatches = new Map<string, { linesMap: Map<number, string>; matchLines: Set<number> }>();
+    const fileMatches = new Map<string, { linesMap: Map<number, string>; matchLines: Set<number>; hits: SearchHit[] }>();
 
     for (const line of lines) {
       try {
@@ -219,11 +237,13 @@ export class SearchEngine {
           const lineNum = parsed.data.line_number;
           const text = parsed.data.lines.text;
           if (!fileMatches.has(file)) {
-            fileMatches.set(file, { linesMap: new Map(), matchLines: new Set() });
+            fileMatches.set(file, { linesMap: new Map(), matchLines: new Set(), hits: [] });
           }
-          fileMatches.get(file)!.linesMap.set(lineNum, text);
+          const fm = fileMatches.get(file)!;
+          fm.linesMap.set(lineNum, text);
           if (parsed.type === "match") {
-            fileMatches.get(file)!.matchLines.add(lineNum);
+            fm.matchLines.add(lineNum);
+            fm.hits.push({ line: lineNum, matchText: text.replace(/\r?\n$/, "") });
           }
         }
       } catch {}
@@ -232,7 +252,9 @@ export class SearchEngine {
     const files = new Map<string, FileResult>();
     for (const [file, data] of fileMatches) {
       const fr = buildFileResult(file, data, maxBytesPerFile, pattern);
-      if (fr) files.set(file, fr);
+      if (fr) {
+        files.set(file, { ...fr, hits: data.hits });
+      }
     }
     return { files };
   }
@@ -286,7 +308,7 @@ function buildFileResult(
   data: { linesMap: Map<number, string>; matchLines: Set<number> },
   maxBytesPerFile: number | undefined,
   pattern: string,
-): FileResult | null {
+): Omit<FileResult, "hits"> | null {
   const allLineNumbers = Array.from(data.linesMap.keys()).sort((a, b) => a - b);
   if (allLineNumbers.length === 0) return null;
 

@@ -17,6 +17,20 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.5.0] — 2026-05-30
+
+### Changed
+
+- **Breaking I/O Schema Change (Wire-Format Compaction):** Pareto-improving break to address the 27% token overhead observed in Unity A/B tests. New compact shapes are now the defaults.
+- **`ParecodeEdit` Line-Range Mode:** The primary path is now line-based rather than whole-string-based. `edits[]` now supports `replaceLines: [start, end]` and `insertAfter: N` operations. Both require an `expect: string` anchor (trimmed first/last line of the target) to verify the state before mutation. String-patching remains as a fallback (`oldString`/`newString`).
+- **`ParecodeEdit` Atomicity:** Per-file edits are now truly atomic. If *any* op in a file fails resolution or `expect` verification, that file is left untouched and a `snippet_mismatch` status is reported per op. Previously, mid-file failures could leave a file partially applied.
+- **`ParecodeSearch` Brief Default:** Results larger than **2 KB** (total content) now omit match windows by default, returning only locations (`lineRanges` and a new `hits: {line, matchText}[]` array). Callers widen specific regions via `ParecodeExpand`. Results under the threshold continue to auto-inline full context.
+- **Envelope Trimming:** Dropped `recommendation` prose and per-match `estimatedTokens` from search results. Tool descriptions in the system prompt have been trimmed from ~1KB to ~5 lines each to save session-start tokens.
+
+### Added
+
+- **`snippet_mismatch` status**: Reported by `ParecodeEdit` when a line-range anchor does not match the file content.
+
 ## [0.4.11] — 2026-05-30
 
 ### Fixed

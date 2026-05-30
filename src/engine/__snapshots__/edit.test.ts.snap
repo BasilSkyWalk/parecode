@@ -4,10 +4,22 @@ exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with
 {
   "results": [
     {
-      "confidence": 1,
       "detail": "2 edits applied",
       "file": "test.ts",
-      "matchedText": "const b = "résumé";",
+      "opResults": [
+        {
+          "confidence": 1,
+          "detail": undefined,
+          "matchedText": "const a = "café";",
+          "status": "success",
+        },
+        {
+          "confidence": 1,
+          "detail": undefined,
+          "matchedText": "const b = "résumé";",
+          "status": "success",
+        },
+      ],
       "status": "success",
     },
   ],
@@ -36,14 +48,20 @@ exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with
 {
   "results": [
     {
-      "confidence": 1,
-      "detail": "1 edit applied",
+      "detail": "1 edits applied",
       "file": "test.ts",
-      "matchedText": "function    hello  (  )   {
+      "opResults": [
+        {
+          "confidence": 1,
+          "detail": undefined,
+          "matchedText": "function    hello  (  )   {
 
 return   "world"  ;
 
 }",
+          "status": "success",
+        },
+      ],
       "status": "success",
     },
   ],

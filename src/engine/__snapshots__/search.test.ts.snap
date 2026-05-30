@@ -13,8 +13,17 @@ Line 19 content to take up space.
 Line 20 content to take up space.
 Line 21 content to take up space.
 ",
-  "estimatedTokens": 61,
   "file": "large.ts",
+  "hits": [
+    {
+      "line": 10,
+      "matchText": "Line 10 content to take up space.",
+    },
+    {
+      "line": 20,
+      "matchText": "Line 20 content to take up space.",
+    },
+  ],
   "lineRanges": [
     [
       8,

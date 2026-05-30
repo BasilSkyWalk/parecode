@@ -3,13 +3,10 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeEditToolSpec: ToolSpec = {
   name: "ParecodeEdit",
   description:
-    "Apply many edits across many files in a single call. " +
-    "Prefer this over Edit / MultiEdit when: " +
-    "(a) editing across multiple files — cross-file edits run in parallel; " +
-    "(b) the exact oldString from a stale read may not match anymore — set fuzzy: true for whitespace-tolerant matching, or fuzzy: 'aggressive' for Unicode-lookalike normalization (avoids a forced re-read on whitespace drift); " +
-    "(c) you have a batch of related changes that would otherwise be N sequential Edit calls. " +
-    "Atomic writes plus mtime-based concurrency control make it safe under parallel agents. " +
-    "Fuzzy matching fails closed below 0.85 confidence and reports status: 'fuzzy_match_failed' so other edits in the batch still apply.",
+    "Apply many edits across many files in a single call. Prefer over native Edit/MultiEdit " +
+    "for batch cross-file changes or when using line-range mode. Supports line-range ops " +
+    "(replaceLines, insertAfter) with 'expect' anchors, and string-patch ops " +
+    "(oldString/newString) with fuzzy matching. Atomic per-file.",
   inputSchema: {
     type: "object",
     properties: {
@@ -23,23 +20,47 @@ export const ParecodeEditToolSpec: ToolSpec = {
               type: "string",
               description: "Absolute or relative path to the file to edit"
             },
+            replaceLines: {
+              type: "array",
+              items: { type: "number" },
+              minItems: 2,
+              maxItems: 2,
+              description: "Inclusive [start, end] line range to replace"
+            },
+            insertAfter: {
+              type: "number",
+              description: "Line number after which to insert content (0 for top of file)"
+            },
+            content: {
+              type: "string",
+              description: "New content for line-range operations"
+            },
+            expect: {
+              type: "string",
+              description: "Short anchor string to verify target (first line\\n…\\nlast line for ranges)"
+            },
             oldString: {
               type: "string",
-              description: "The exact string to find and replace"
+              description: "The exact string to find and replace (string-patch fallback)"
             },
             newString: {
               type: "string",
-              description: "The new string to replace it with"
+              description: "The new string to replace it with (string-patch fallback)"
             },
             fuzzy: {
               anyOf: [
                 { type: "boolean" },
                 { type: "string", enum: ["aggressive"] }
               ],
-              description: "If true, allows whitespace-tolerant matching. If 'aggressive', also normalizes Unicode lookalikes."
+              description: "If true, allows whitespace-tolerant matching for string-patch fallback."
             }
           },
-          required: ["file", "oldString", "newString"]
+          required: ["file"],
+          oneOf: [
+            { required: ["replaceLines", "content", "expect"] },
+            { required: ["insertAfter", "content", "expect"] },
+            { required: ["oldString", "newString"] }
+          ]
         }
       }
     },
