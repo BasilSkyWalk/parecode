@@ -17,6 +17,13 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.4.10] — 2026-05-30
+
+### Added
+
+- **`parecode envelope`** — new CLI subcommand summarizing per-tool-call response sizes and durations from a new ground-truth envelope log (`<dataDir>/envelope.jsonl`). Every MCP tool call now records `bytesReturned` and `durationMs` keyed by tool name and session id. Pass `--since 7d` to filter, `--json` for machine output. Foundation for A/B benchmarking Parecode against native Grep+Read.
+- **`parecode tokens`** — new CLI subcommand summarizing Claude Code session token totals (`input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `output_tokens`) read directly from `~/.claude/projects/*/*.jsonl` transcripts. Per-assistant-turn usage is deduplicated by `message.id`. Pass `--since 7d`, `--limit N`, `--json`.
+
 ## [0.4.9] — 2026-05-29
 
 ### Changed

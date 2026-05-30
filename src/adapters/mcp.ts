@@ -6,14 +6,17 @@ import { ToolHost, ToolSpec, ToolHandler, SubagentResult } from "./base.js";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 
 import { Tracker } from "../stats/tracker.js";
+import { EnvelopeLogger } from "../stats/envelope.js";
 
 export class McpAdapter implements ToolHost {
   private server: Server;
   private tracker: Tracker;
+  private envelope: EnvelopeLogger;
   private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
 
   constructor() {
     this.tracker = new Tracker();
+    this.envelope = new EnvelopeLogger(this.tracker.getSessionId());
     this.server = new Server(
       { name: "parecode", version: "0.0.0" },
       { capabilities: { tools: {} } }
@@ -34,13 +37,22 @@ export class McpAdapter implements ToolHost {
       if (!tool) {
         throw new Error(`Tool not found: ${request.params.name}`);
       }
+      const startedAt = Date.now();
       try {
         const result = await tool.handler(request.params.arguments);
+        const text = JSON.stringify(result, null, 2);
+        this.envelope.record({
+          toolCall: tool.spec.name,
+          bytesReturned: Buffer.byteLength(text, "utf-8"),
+          durationMs: Date.now() - startedAt,
+          isError: false,
+        }).catch(() => {});
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text }]
         };
       } catch (error) {
         const err = error as Error;
+        const errorText = `Error: ${err.message}`;
         this.recordStat({
           toolCall: tool.spec.name,
           estimatedNativeTokens: 0,
@@ -48,8 +60,14 @@ export class McpAdapter implements ToolHost {
           callsBatched: 0,
           error: err.message,
         });
+        this.envelope.record({
+          toolCall: tool.spec.name,
+          bytesReturned: Buffer.byteLength(errorText, "utf-8"),
+          durationMs: Date.now() - startedAt,
+          isError: true,
+        }).catch(() => {});
         return {
-          content: [{ type: "text", text: `Error: ${err.message}` }],
+          content: [{ type: "text", text: errorText }],
           isError: true,
         };
       }
@@ -58,10 +76,12 @@ export class McpAdapter implements ToolHost {
 
   public async initTracker(): Promise<void> {
     await this.tracker.init();
+    await this.envelope.init();
   }
 
   public async finalizeTracker(): Promise<void> {
     await this.tracker.finalize();
+    await this.envelope.flush();
   }
 
   public registerTool(spec: ToolSpec, handler: ToolHandler): void {

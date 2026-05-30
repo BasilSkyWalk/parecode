@@ -12,6 +12,8 @@ import { pruneCommand } from "./prune.js";
 import { doctorCommand } from "./doctor.js";
 import { flushCommand } from "./flush.js";
 import { hookCommand } from "./hook.js";
+import { tokensCommand } from "./tokens.js";
+import { envelopeCommand } from "./envelope.js";
 
 async function serve() {
   const adapter = new McpAdapter();
@@ -80,6 +82,12 @@ async function main() {
       break;
     case "hook":
       await hookCommand(args.slice(1));
+      break;
+    case "tokens":
+      await tokensCommand(args.slice(1));
+      break;
+    case "envelope":
+      await envelopeCommand(args.slice(1));
       break;
     default:
       process.stderr.write(`Unknown command: ${cmd}\n`);
