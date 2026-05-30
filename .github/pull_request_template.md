@@ -13,7 +13,7 @@
 ## Checklist
 
 - [ ] Tests added or updated (engines ≥ 90% lines, CLI ≥ 70%)
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` all green locally
+- [ ] `npm run build`, `npm test` all green locally
 - [ ] Tool descriptions in `tools/*.ts` re-read cold if behavior changed
 - [ ] `CHANGELOG.md` updated under the next release heading
 - [ ] Docs updated (`README.md`, `docs/`, ADR added if architectural)
