@@ -63,6 +63,19 @@ Then in any session, the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` 
 
 ---
 
+## Measured savings
+
+On search-and-edit tasks — finding call sites, multi-file refactors, "do X to every Y" — Parecode cut **cost ~40%** and **assistant turns ~75–83%** in matched A/B tests:
+
+| repo | task | cost | turns |
+|---|---|--:|--:|
+| TypeScript | find every call site of a symbol, edit each (17 sites, 8 files) | −43% | −83% |
+| Unity / C# | find every call site of a symbol, edit each (11 sites, 5 files) | −41% | −76% |
+
+_Method: the identical task run with Parecode on vs off, a fresh session per run, n=3 per arm with alternated order, Sonnet 4.6. Savings come from collapsing many `Grep` / `Read` / `Edit` round-trips into single `ParecodeSearch` / `ParecodeEdit` calls — so the win scales with how much searching and multi-file fan-out a task involves, and shrinks toward zero on single-file or reasoning-heavy tasks. These are measured per-session token and cost numbers, not the estimates in the scan below._
+
+---
+
 ## Retroactive Savings Scan
 
 Curious how much Parecode would have saved you if you had installed it earlier? You can scan your past Claude Code sessions:
