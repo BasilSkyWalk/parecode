@@ -17,6 +17,12 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.5.2] — 2026-05-31
+
+### Added
+
+- `mcpName` (`io.github.BasilSkyWalk/parecode`) in `package.json` and a root `server.json`, enabling publication to the official [MCP Registry](https://registry.modelcontextprotocol.io). Metadata only — no runtime, tool-schema, or behavior changes.
+
 ## [0.5.1] — 2026-05-31
 
 ### Added
