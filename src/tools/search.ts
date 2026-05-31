@@ -3,10 +3,16 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeSearchToolSpec: ToolSpec = {
   name: "ParecodeSearch",
   description:
-    "Search the codebase with ripgrep and return matches with context in a single call. " +
-    "Prefer over native grep/find for targeted multi-pattern lookups or when needing context windows. " +
-    "Results ≤ 2KB are auto-inlined; larger results return locations only to be widened " +
-    "via ParecodeExpand. Supports regex and path scoping.",
+    "Search the codebase with ripgrep and get matches plus surrounding context in ONE call — " +
+    "use instead of Grep/Glob-then-Read, a raw `rg`/`grep` in the shell, or re-reading the same file " +
+    "at different line ranges. Pass `pattern` as an array to run several regexes in parallel for flow " +
+    "tracing (e.g. ['HandleX','OnX','XClosed']); each match lists which `patterns` hit it. Overlapping or " +
+    "adjacent windows in a file are merged (gap ≤ contextLines), and the result carries one envelope-level " +
+    "`estimatedTokens` so you can budget before consuming. Read-only: to widen a match use ParecodeExpand, " +
+    "to change code use ParecodeEdit. Per-file content over ~2KB is dropped (its lines listed in " +
+    "`omittedLineRanges`) to protect context — widen those via ParecodeExpand instead of re-reading the file. " +
+    "Needs ripgrep on PATH (run `parecode doctor` if missing). In CodeGraph repos (.codegraph/), prefer " +
+    "codegraph_explore for broad 'how does X work?' questions; this stays best for targeted multi-pattern lookups.",
   inputSchema: {
     type: "object",
     properties: {
@@ -21,7 +27,7 @@ export const ParecodeSearchToolSpec: ToolSpec = {
       paths: {
         type: "array",
         items: { type: "string" },
-        description: "List of directory or file paths to restrict the search",
+        description: "Directory or file paths to restrict the search. Defaults to the current working directory.",
       },
       contextLines: {
         type: "number",
@@ -30,7 +36,7 @@ export const ParecodeSearchToolSpec: ToolSpec = {
       },
       maxBytesPerFile: {
         type: "number",
-        description: "Maximum bytes to return per file before chunking the output around match centers.",
+        description: "Soft cap on bytes returned per file; above it, output is chunked around match centers and the trimmed lines are reported in omittedLineRanges (widen them with ParecodeExpand).",
       },
       relatedSymbols: {
         type: "boolean",
