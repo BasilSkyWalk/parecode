@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+*.tgz
+harness
+docs
+*.md
+.claude
+.npmrc
+vitest.config.ts
+**/*.test.ts
