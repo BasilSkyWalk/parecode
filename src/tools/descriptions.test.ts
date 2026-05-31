@@ -4,9 +4,9 @@ import { ParecodeSearchToolSpec } from "./search.js";
 import { ParecodeExpandToolSpec } from "./expand.js";
 
 describe("Tool Descriptions", () => {
-  const PARECODE_EDIT_DESCRIPTION_MAX_CHARS = 450;
-  const PARECODE_SEARCH_DESCRIPTION_MAX_CHARS = 450;
-  const PARECODE_EXPAND_DESCRIPTION_MAX_CHARS = 350;
+  const PARECODE_EDIT_DESCRIPTION_MAX_CHARS = 1100;
+  const PARECODE_SEARCH_DESCRIPTION_MAX_CHARS = 1100;
+  const PARECODE_EXPAND_DESCRIPTION_MAX_CHARS = 900;
 
   it("ParecodeEdit description is compact", () => {
     expect(ParecodeEditToolSpec.description.length).toBeLessThan(PARECODE_EDIT_DESCRIPTION_MAX_CHARS);

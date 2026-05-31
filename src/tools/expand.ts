@@ -3,14 +3,16 @@ import { ToolSpec } from "../adapters/base.js";
 export const ParecodeExpandToolSpec: ToolSpec = {
   name: "ParecodeExpand",
   description:
-    "Widen a known (file, startLine, endLine) range. " +
-    "Prefer over native Read when you already know roughly where the interesting code lives " +
-    "and just need more surrounding context. Clamps out-of-range lines silently; the " +
-    "returned lineRange reflects the actual slice.",
+    "Read a specific line range of a file — the natural follow-up to a ParecodeSearch match or an " +
+    "`omittedLineRanges` entry it returned. Use instead of a full-file Read (or Read with offset/limit) " +
+    "when you already know roughly where the code lives and just need more lines around it. Give the known " +
+    "(file, startLine, endLine) and optionally pad with contextBefore/contextAfter; out-of-range lines are " +
+    "clamped silently and the returned `lineRange` reflects the actual slice. Reports `estimatedTokens` in " +
+    "the same form as ParecodeSearch so you can budget before consuming. Read-only — to change code use ParecodeEdit.",
   inputSchema: {
     type: "object",
     properties: {
-      file: { type: "string", description: "Path to the file to read" },
+      file: { type: "string", description: "Path to the file to read (typically the `file` from a ParecodeSearch match)." },
       startLine: { type: "number", description: "Starting line (1-based, inclusive)" },
       endLine: { type: "number", description: "Ending line (1-based, inclusive)" },
       contextBefore: {
