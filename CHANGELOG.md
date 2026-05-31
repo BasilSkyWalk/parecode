@@ -17,6 +17,16 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.5.1] — 2026-05-31
+
+### Added
+
+- `glama.json` server manifest at the repo root and a Glama quality-badge placeholder in the README, for listing on the [Glama](https://glama.ai) MCP directory.
+
+### Changed
+
+- Rewrote the `ParecodeSearch`, `ParecodeExpand`, and `ParecodeEdit` tool and parameter descriptions for clarity, usage guidance, and Glama tool-definition quality. Documentation only — no tool names, input schemas, or output shapes changed.
+
 ## [0.5.0] — 2026-05-30
 
 ### Changed
