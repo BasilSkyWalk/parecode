@@ -2,6 +2,11 @@
 
 An MCP server that gives coding agents context-window-aware search and safe, atomic multi-file edits — built to cut token usage on large codebases without giving up correctness.
 
+<!-- GLAMA QUALITY BADGE — PLACEHOLDER.
+     TODO(maintainer): after claiming the server and cutting a Glama release at https://glama.ai,
+     copy the badge markdown from your server's page and replace the commented line below. -->
+<!-- [![Glama quality](https://glama.ai/mcp/servers/<SERVER_ID>/badge)](https://glama.ai/mcp/servers/<SERVER_ID>) -->
+
 ---
 
 ## Requirements
