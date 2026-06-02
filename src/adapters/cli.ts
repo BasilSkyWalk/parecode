@@ -9,6 +9,7 @@ const processStartupId = `${process.pid}-${process.hrtime.bigint().toString()}`;
 export class CliAdapter implements ToolHost {
   private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
   private realpathCache = new Map<string, string>();
+  private dirListCache = new Map<string, string[]>();
 
   public registerTool(spec: ToolSpec, handler: ToolHandler): void {
     this.tools.set(spec.name, { spec, handler });
@@ -78,6 +79,32 @@ export class CliAdapter implements ToolHost {
       this.realpathCache.set(p, p);
       return p;
     }
+  }
+
+  public async listDirs(p: string, depth: number): Promise<string[]> {
+    const cacheKey = `${p}:${depth}`;
+    if (this.dirListCache.has(cacheKey)) {
+      return this.dirListCache.get(cacheKey)!;
+    }
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const result: string[] = [];
+    async function walk(currentPath: string, currentDepth: number) {
+      if (currentDepth > depth) return;
+      try {
+        const dirents = await fs.readdir(currentPath, { withFileTypes: true });
+        for (const dirent of dirents) {
+          if (dirent.isDirectory() && !dirent.name.startsWith(".")) {
+            const fullPath = path.join(currentPath, dirent.name);
+            result.push(fullPath);
+            await walk(fullPath, currentDepth + 1);
+          }
+        }
+      } catch {}
+    }
+    await walk(p, 1);
+    this.dirListCache.set(cacheKey, result);
+    return result;
   }
 
   public async statFile(filepath: string): Promise<{ mtimeMs: number; size: number }> {
