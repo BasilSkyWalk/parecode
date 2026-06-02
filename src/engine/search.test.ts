@@ -599,6 +599,44 @@ describe("SearchEngine", () => {
     });
   });
 
+  describe("v0.3: summary pass", () => {
+    it("omits summary when matches <= 10", async () => {
+      const events: RgEvent[] = [];
+      for (let i = 1; i <= 10; i++) {
+        events.push({ type: "match", file: `f${i}.ts`, line: 1, text: `hit${i}\n` });
+      }
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+      const result = await engine.search({ pattern: "hit" });
+
+      expect(result.matches).toHaveLength(10);
+      expect(result.summary).toBeUndefined();
+    });
+
+    it("includes summary with top 10 matches by estimatedTokens when matches > 10", async () => {
+      const events: RgEvent[] = [];
+      // 12 matches, with lengths increasing so the last 10 are the largest
+      for (let i = 1; i <= 12; i++) {
+        events.push({ type: "match", file: `f${i}.ts`, line: 1, text: "x".repeat(i * 10) + "\n" });
+      }
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.matches).toHaveLength(12);
+      expect(result.summary).toBeDefined();
+      expect(result.summary).toHaveLength(10);
+      // The largest files should be f12 to f3
+      expect(result.summary![0].file).toBe("f12.ts");
+      expect(result.summary![9].file).toBe("f3.ts");
+      expect(result.summary![0].estimatedTokens).toBeGreaterThan(result.summary![9].estimatedTokens);
+    });
+  });
+
   describe("v0.5: dedupWindows", () => {
     it("leaves matches unchanged when there is no prior history", () => {
       const matches = [

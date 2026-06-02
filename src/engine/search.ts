@@ -189,12 +189,14 @@ export class SearchEngine {
       }),
     );
 
+    const matchesWithTokens = matches.map((m) => ({ ...m, estimatedTokens: m.content ? estimateTokens(m.content) : 0 }));
+
     const estimatedTokensTotal = estimateSearchEnvelopeTokens(
-      matches.map((m) => ({ ...m, estimatedTokens: m.content ? estimateTokens(m.content) : 0 })),
+      matchesWithTokens,
       errors,
     );
 
-    const actualTokens = matches.reduce((s, m) => s + (m.content ? estimateTokens(m.content) : 0), 0);
+    const actualTokens = matchesWithTokens.reduce((s, m) => s + m.estimatedTokens, 0);
 
     this.host.recordStat({
       toolCall: "ParecodeSearch",
@@ -206,11 +208,24 @@ export class SearchEngine {
       callsBatched: matches.length,
     });
 
+    let summary: Array<{ file: string; lineRanges: Array<[number, number]>; estimatedTokens: number }> | undefined;
+    if (matches.length > 10) {
+      summary = [...matchesWithTokens]
+        .sort((a, b) => b.estimatedTokens - a.estimatedTokens)
+        .slice(0, 10)
+        .map(m => ({
+          file: m.file,
+          lineRanges: m.lineRanges,
+          estimatedTokens: m.estimatedTokens
+        }));
+    }
+
     return {
       status: "success",
-      matches,
+      matches: matchesWithTokens,
       ...(errors.length > 0 ? { errors } : {}),
       estimatedTokens: estimatedTokensTotal,
+      ...(summary ? { summary } : {}),
     };
   }
 
