@@ -13,6 +13,8 @@ export interface Spill {
   createdAt: number;
   consumed: boolean;
   fromCallId: string;
+  patterns?: string[];
+  paths?: string[];
 }
 
 export interface PatternWarning {
@@ -157,7 +159,9 @@ function isSpill(value: unknown): value is Spill {
     typeof value.path === "string" &&
     typeof value.createdAt === "number" &&
     typeof value.consumed === "boolean" &&
-    typeof value.fromCallId === "string"
+    typeof value.fromCallId === "string" &&
+    (value.patterns === undefined || (Array.isArray(value.patterns) && value.patterns.every(p => typeof p === "string"))) &&
+    (value.paths === undefined || (Array.isArray(value.paths) && value.paths.every(p => typeof p === "string")))
   );
 }
 

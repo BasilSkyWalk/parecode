@@ -6,7 +6,7 @@ import { SessionMemory, createSessionMemory } from "./sessionMemory.js";
 describe("assessPatterns", () => {
   it("detects pattern_directory_collision when pattern is a substring of a directory", () => {
     const memory = createSessionMemory("test");
-    const result = assessPatterns(["MiniGame"], ["src/MiniGames", "src/Other"], memory);
+    const result = assessPatterns(["MiniGame"], undefined, ["src/MiniGames", "src/Other"], memory);
     
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
@@ -18,7 +18,7 @@ describe("assessPatterns", () => {
 
   it("is case-insensitive for directory collisions", () => {
     const memory = createSessionMemory("test");
-    const result = assessPatterns(["USER"], ["src/users"], memory);
+    const result = assessPatterns(["USER"], undefined, ["src/users"], memory);
     
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe("pattern_directory_collision");
@@ -27,40 +27,78 @@ describe("assessPatterns", () => {
   it("ignores short patterns for directory collisions", () => {
     const memory = createSessionMemory("test");
     // "id" is 2 chars, which is < 3
-    const result = assessPatterns(["id"], ["src/identifiers"], memory);
+    const result = assessPatterns(["id"], undefined, ["src/identifiers"], memory);
+    
+    // It should not return pattern_directory_collision, but will return pattern_too_short
+    expect(result.some(r => r.kind === "pattern_directory_collision")).toBe(false);
+  });
+
+  it("returns no warnings if directories don't match and pattern is long enough", () => {
+    const memory = createSessionMemory("test");
+    const result = assessPatterns(["MiniGame"], undefined, ["src/Users", "src/Cards"], memory);
     
     expect(result).toHaveLength(0);
   });
 
-  it("returns no warnings if directories don't match", () => {
+  it("detects pattern_too_short when pattern has fewer than 4 symbol chars", () => {
     const memory = createSessionMemory("test");
-    const result = assessPatterns(["MiniGame"], ["src/Users", "src/Cards"], memory);
+    const result = assessPatterns(["id", "a+b=c", "long_enough_pattern"], undefined, [], memory);
     
-    expect(result).toHaveLength(0);
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe("pattern_too_short");
+    expect(result[0].pattern).toBe("id");
+    expect(result[1].kind).toBe("pattern_too_short");
+    expect(result[1].pattern).toBe("a+b=c");
+  });
+
+  it("detects prior_overflow_recurrence when paths match exactly and patterns overlap", () => {
+    let memory = createSessionMemory("test");
+    memory = {
+      ...memory,
+      spills: [{
+        path: "/tmp/spill1",
+        createdAt: 1,
+        consumed: false,
+        fromCallId: "1",
+        patterns: ["MiniGame", "OtherPattern"],
+        paths: ["src/MiniGames"]
+      }]
+    };
+    
+    // Same pattern and identical paths
+    const result1 = assessPatterns(["MiniGame"], ["src/MiniGames"], [], memory);
+    expect(result1).toHaveLength(1);
+    expect(result1[0].kind).toBe("prior_overflow_recurrence");
+    
+    // Different paths -> no warning
+    const result2 = assessPatterns(["MiniGame"], ["src/Other"], [], memory);
+    expect(result2).toHaveLength(0);
+
+    // Overlapping pattern, identical paths but different order
+    const result3 = assessPatterns(["OtherPattern"], ["src/MiniGames"], [], memory);
+    expect(result3).toHaveLength(1);
+    expect(result3[0].kind).toBe("prior_overflow_recurrence");
   });
 
   it("is monotonic with respect to history (property test)", () => {
-    // For now, history doesn't affect pattern_directory_collision.
-    // When prior_overflow_recurrence is implemented, more history might add warnings.
-    // We just verify that (warnings with history1) subset of (warnings with history1 + history2)
     fc.assert(
       fc.property(
-        fc.array(fc.string({ minLength: 1, maxLength: 20 }), { maxLength: 5 }),
+        fc.array(fc.string({ minLength: 4, maxLength: 20 }).filter(s => s.replace(/[^A-Za-z0-9_]/g, "").length >= 4), { maxLength: 5 }),
         fc.array(fc.string({ minLength: 1, maxLength: 20 }), { maxLength: 5 }),
         (patterns, dirs) => {
           const memory = createSessionMemory("test");
-          const result1 = assessPatterns(patterns, dirs, memory);
+          const result1 = assessPatterns(patterns, undefined, dirs, memory);
           
           // Add some fake spills to memory
           const memory2: SessionMemory = {
             ...memory,
             spills: [
-              { path: "fake1", createdAt: 1, consumed: false, fromCallId: "1" },
-              { path: "fake2", createdAt: 2, consumed: false, fromCallId: "2" }
+              { path: "fake1", createdAt: 1, consumed: false, fromCallId: "1", patterns: ["fake1"], paths: ["fake1"] },
+              { path: "fake2", createdAt: 2, consumed: false, fromCallId: "2", patterns: ["fake2"], paths: ["fake2"] }
             ]
           };
           
-          const result2 = assessPatterns(patterns, dirs, memory2);
+          const result2 = assessPatterns(patterns, undefined, dirs, memory2);
           expect(result2.length).toBeGreaterThanOrEqual(result1.length);
           
           for (const w1 of result1) {
