@@ -1,7 +1,8 @@
 import * as path from "node:path";
 import { ToolHost } from "../adapters/base.js";
 import { estimateTokens, estimateSearchEnvelopeTokens, estimateReferenceTokens } from "../stats/estimator.js";
-import { ReturnedWindow, load, persist, recordSpill, markSpillConsumed, recordReturnedWindows } from "./sessionMemory.js";
+import { ReturnedWindow, SessionMemory, createSessionMemory, load, persist, recordSpill, markSpillConsumed, recordReturnedWindows } from "./sessionMemory.js";
+import { assessPatterns } from "./patternAssessment.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -133,6 +134,8 @@ export class SearchEngine {
     } catch (e) {
       this.host.log("warn", "failed to mark spill consumed in search", { error: String(e) });
     }
+
+    const warningsPromise = this.preflightWarnings(patterns, paths, updatedMemory);
 
     const runs = await Promise.all(
       patterns.map((p) => this.runPattern(rgPath, p, paths, ctx, args.maxBytesPerFile)),
@@ -267,8 +270,10 @@ export class SearchEngine {
       tokensDeduped,
     });
 
+    const warnings = await warningsPromise;
+
     if (estimatedTokensTotal > SPILL_TOKEN_THRESHOLD) {
-      return await this.spill(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, errors, estimatedTokensTotal);
+      return await this.spill(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, errors, estimatedTokensTotal, patterns, paths, warnings);
     }
 
     if (updatedMemory && matchesWithTokens.length > 0) {
@@ -310,14 +315,39 @@ export class SearchEngine {
       ...(errors.length > 0 ? { errors } : {}),
       estimatedTokens: estimatedTokensTotal,
       ...(summary ? { summary } : {}),
+      ...(warnings ? { warnings } : {}),
       ...(spillReminder ? { spillReminder } : {}),
     };
+  }
+
+  private async preflightWarnings(
+    patterns: string[],
+    paths: string[],
+    memory: SessionMemory | undefined,
+  ): Promise<SearchResult["warnings"]> {
+    let availableDirectories: string[] = [];
+    try {
+      const listings = await Promise.all(paths.map((p) => this.host.listDirs(p, 2)));
+      availableDirectories = listings.flat();
+    } catch (e) {
+      this.host.log("warn", "directory listing for pattern pre-flight failed", { error: String(e) });
+    }
+    const history = memory ?? createSessionMemory(this.host.sessionId());
+    const assessments = assessPatterns(patterns, paths, availableDirectories, history);
+    if (assessments.length === 0) return undefined;
+    for (const a of assessments) {
+      this.host.log("warn", "pattern pre-flight warning", { kind: a.kind, pattern: a.pattern, detail: a.detail });
+    }
+    return assessments;
   }
 
   private async spill(
     matches: Array<SearchMatch & { estimatedTokens: number }>,
     errors: Array<{ pattern: string; detail: string }>,
     estimatedTokens: number,
+    patterns: string[],
+    paths: string[],
+    warnings: SearchResult["warnings"],
   ): Promise<SearchResult> {
     const createdAt = Date.now();
     const sessionId = this.host.sessionId();
@@ -335,7 +365,7 @@ export class SearchEngine {
     await this.host.writeFile(spillPath, payload);
 
     const memory = await load(this.host, dir, sessionId);
-    await persist(this.host, dir, recordSpill(memory, { path: spillPath, createdAt, consumed: false, fromCallId }));
+    await persist(this.host, dir, recordSpill(memory, { path: spillPath, createdAt, consumed: false, fromCallId, patterns, paths }));
 
     this.host.log("info", "search result spilled to file", { spillPath, estimatedTokens });
 
@@ -360,6 +390,7 @@ export class SearchEngine {
         `Use ParecodeExpand on a file + range from the summary below to fetch only what you need.`,
       summary,
       estimatedTokens,
+      ...(warnings ? { warnings } : {}),
       ...(spillReminder ? { spillReminder } : {}),
     };
   }
