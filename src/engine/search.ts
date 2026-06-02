@@ -1,5 +1,6 @@
 import { ToolHost } from "../adapters/base.js";
 import { estimateTokens, estimateSearchEnvelopeTokens } from "../stats/estimator.js";
+import { ReturnedWindow } from "./sessionMemory.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -448,6 +449,50 @@ export function planMerges(
   }
   groups.push(curGroup);
   return { groups };
+}
+
+export function dedupWindows(
+  matches: SearchMatch[],
+  returnedWindows: ReturnedWindow[],
+  contextLines: number,
+): SearchMatch[] {
+  const result: SearchMatch[] = [];
+
+  for (const match of matches) {
+    const priorForFile = returnedWindows.filter((w) => w.file === match.file);
+    if (priorForFile.length === 0) {
+      result.push(match);
+      continue;
+    }
+
+    const newRanges: Array<[number, number]> = [];
+    const newContents: string[] = [];
+    const contents = match.content ? match.content.split("\n---\n\n") : [];
+
+    for (let i = 0; i < match.lineRanges.length; i++) {
+      const [start, end] = match.lineRanges[i];
+      const content = contents[i];
+
+      const isSubset = priorForFile.some(
+        (prior) => prior.startLine <= start && prior.endLine >= end,
+      );
+
+      if (!isSubset) {
+        newRanges.push([start, end]);
+        if (content !== undefined) newContents.push(content);
+      }
+    }
+
+    if (newRanges.length > 0) {
+      result.push({
+        ...match,
+        lineRanges: newRanges,
+        ...(match.content !== undefined ? { content: newContents.join("\n---\n\n") } : {}),
+      });
+    }
+  }
+
+  return result;
 }
 
 async function mergeWindowGroup(

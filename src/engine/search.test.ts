@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import { SearchEngine, planMerges, findRelatedSymbols } from "./search.js";
+import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows } from "./search.js";
 import { ToolHost } from "../adapters/base.js";
 
 interface RgEvent {
@@ -594,6 +594,75 @@ describe("SearchEngine", () => {
 
       expect(result.status).toBe("success");
       expect(result.matches![0].content).toBe("hit\n");
+    });
+  });
+
+  describe("v0.5: dedupWindows", () => {
+    it("leaves matches unchanged when there is no prior history", () => {
+      const matches = [
+        { file: "a.ts", hits: [], lineRanges: [[1, 5]] as Array<[number, number]>, patterns: ["x"], content: "line1\n" }
+      ];
+      const result = dedupWindows(matches, [], 2);
+      expect(result).toEqual(matches);
+    });
+
+    it("drops a block if it is completely covered by a prior window", () => {
+      const matches = [
+        { file: "a.ts", hits: [], lineRanges: [[5, 10]] as Array<[number, number]>, patterns: ["x"], content: "lines5-10" }
+      ];
+      const history = [
+        { file: "a.ts", startLine: 1, endLine: 20, returnedAt: 123, fromCallId: "abc" }
+      ];
+      const result = dedupWindows(matches, history, 2);
+      expect(result).toEqual([]);
+    });
+
+    it("keeps a block if it only partially overlaps a prior window", () => {
+      const matches = [
+        { file: "a.ts", hits: [], lineRanges: [[5, 10]] as Array<[number, number]>, patterns: ["x"], content: "lines5-10" }
+      ];
+      const history = [
+        { file: "a.ts", startLine: 1, endLine: 7, returnedAt: 123, fromCallId: "abc" }
+      ];
+      const result = dedupWindows(matches, history, 2);
+      expect(result).toEqual(matches);
+    });
+
+    it("splits blocks correctly when one is covered and the other is not", () => {
+      const matches = [
+        {
+          file: "a.ts",
+          hits: [],
+          lineRanges: [[5, 10], [20, 25]] as Array<[number, number]>,
+          patterns: ["x"],
+          content: "lines5-10\n---\n\nlines20-25"
+        }
+      ];
+      const history = [
+        { file: "a.ts", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
+      ];
+      const result = dedupWindows(matches, history, 2);
+      expect(result).toHaveLength(1);
+      expect(result[0].lineRanges).toEqual([[20, 25]]);
+      expect(result[0].content).toBe("lines20-25");
+    });
+    
+    it("handles omitted content correctly when splitting blocks", () => {
+      const matches = [
+        {
+          file: "a.ts",
+          hits: [],
+          lineRanges: [[5, 10], [20, 25]] as Array<[number, number]>,
+          patterns: ["x"],
+        }
+      ];
+      const history = [
+        { file: "a.ts", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
+      ];
+      const result = dedupWindows(matches, history, 2);
+      expect(result).toHaveLength(1);
+      expect(result[0].lineRanges).toEqual([[20, 25]]);
+      expect(result[0].content).toBeUndefined();
     });
   });
 });
