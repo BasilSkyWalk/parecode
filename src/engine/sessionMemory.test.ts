@@ -14,6 +14,7 @@ import {
   ReturnedWindow,
   Spill,
   SessionMemoryIo,
+  createDebouncedPersister,
 } from "./sessionMemory.js";
 
 const io: SessionMemoryIo = {
@@ -97,5 +98,61 @@ describe("sessionMemory FIFO eviction", () => {
     const next = recordReturnedWindows(original, [window("a.ts", 1)]);
     expect(original.returnedWindows).toEqual([]);
     expect(next).not.toBe(original);
+  });
+});
+
+describe("createDebouncedPersister", () => {
+  it("coalesces multiple persist calls into one write", async () => {
+    let writeCount = 0;
+    const testIo: SessionMemoryIo = {
+      ...io,
+      writeFile: async (p, c) => {
+        writeCount++;
+        await io.writeFile(p, c);
+      },
+    };
+
+    const tmp = await dir({ unsafeCleanup: true });
+    const persister = createDebouncedPersister(testIo, tmp.path, 10);
+
+    const m1 = createSessionMemory("s", 1);
+    const m2 = createSessionMemory("s", 2);
+    const m3 = createSessionMemory("s", 3);
+
+    persister.persist(m1);
+    persister.persist(m2);
+    persister.persist(m3);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(writeCount).toBe(1);
+    const loaded = await load(testIo, tmp.path, "s");
+    expect(loaded.startedAt).toBe(3);
+
+    await tmp.cleanup();
+  });
+
+  it("flushes immediately when requested", async () => {
+    let writeCount = 0;
+    const testIo: SessionMemoryIo = {
+      ...io,
+      writeFile: async (p, c) => {
+        writeCount++;
+        await io.writeFile(p, c);
+      },
+    };
+
+    const tmp = await dir({ unsafeCleanup: true });
+    const persister = createDebouncedPersister(testIo, tmp.path, 1000); // long delay
+
+    const m1 = createSessionMemory("s", 1);
+    persister.persist(m1);
+    await persister.flush();
+
+    expect(writeCount).toBe(1);
+    const loaded = await load(testIo, tmp.path, "s");
+    expect(loaded.startedAt).toBe(1);
+
+    await tmp.cleanup();
   });
 });

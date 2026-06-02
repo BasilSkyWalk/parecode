@@ -80,6 +80,48 @@ export async function persist(io: SessionMemoryIo, dir: string, memory: SessionM
   await io.writeFile(sessionFilePath(dir, memory.sessionId), JSON.stringify(memory));
 }
 
+export interface DebouncedPersister {
+  persist(memory: SessionMemory): void;
+  flush(): Promise<void>;
+}
+
+export function createDebouncedPersister(io: SessionMemoryIo, dir: string, delayMs = 100): DebouncedPersister {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let latestMemory: SessionMemory | undefined;
+  let writePromise: Promise<void> | undefined;
+
+  async function flush(): Promise<void> {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+      timeout = undefined;
+    }
+    if (!latestMemory) {
+      return;
+    }
+    const memory = latestMemory;
+    latestMemory = undefined;
+
+    if (writePromise) {
+      await writePromise.catch(() => {});
+    }
+    writePromise = persist(io, dir, memory);
+    await writePromise;
+  }
+
+  return {
+    persist(memory: SessionMemory) {
+      latestMemory = memory;
+      if (timeout === undefined) {
+        timeout = setTimeout(() => {
+          timeout = undefined;
+          flush().catch(() => {});
+        }, delayMs);
+      }
+    },
+    flush,
+  };
+}
+
 function keepNewest<T>(items: T[], max: number): T[] {
   return items.length <= max ? items : items.slice(items.length - max);
 }
