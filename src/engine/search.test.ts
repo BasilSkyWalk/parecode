@@ -606,7 +606,7 @@ describe("SearchEngine", () => {
       expect(result).toEqual(matches);
     });
 
-    it("drops a block if it is completely covered by a prior window", () => {
+    it("emits a reference if a block is completely covered by a prior window", () => {
       const matches = [
         { file: "a.ts", hits: [], lineRanges: [[5, 10]] as Array<[number, number]>, patterns: ["x"], content: "lines5-10" }
       ];
@@ -614,7 +614,13 @@ describe("SearchEngine", () => {
         { file: "a.ts", startLine: 1, endLine: 20, returnedAt: 123, fromCallId: "abc" }
       ];
       const result = dedupWindows(matches, history, 2);
-      expect(result).toEqual([]);
+      expect(result).toEqual([{
+        kind: "reference",
+        file: "a.ts",
+        lineRanges: [[5, 10]],
+        returnedAt: 123,
+        note: expect.stringContaining("Already returned")
+      }]);
     });
 
     it("keeps a block if it only partially overlaps a prior window", () => {
@@ -642,9 +648,16 @@ describe("SearchEngine", () => {
         { file: "a.ts", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
       ];
       const result = dedupWindows(matches, history, 2);
-      expect(result).toHaveLength(1);
-      expect(result[0].lineRanges).toEqual([[20, 25]]);
-      expect(result[0].content).toBe("lines20-25");
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        kind: "reference",
+        file: "a.ts",
+        lineRanges: [[5, 10]],
+        returnedAt: 123,
+        note: expect.stringContaining("Already returned")
+      });
+      expect(result[1].lineRanges).toEqual([[20, 25]]);
+      expect(result[1].content).toBe("lines20-25");
     });
     
     it("handles omitted content correctly when splitting blocks", () => {
@@ -660,9 +673,16 @@ describe("SearchEngine", () => {
         { file: "a.ts", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
       ];
       const result = dedupWindows(matches, history, 2);
-      expect(result).toHaveLength(1);
-      expect(result[0].lineRanges).toEqual([[20, 25]]);
-      expect(result[0].content).toBeUndefined();
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        kind: "reference",
+        file: "a.ts",
+        lineRanges: [[5, 10]],
+        returnedAt: 123,
+        note: expect.stringContaining("Already returned")
+      });
+      expect(result[1].lineRanges).toEqual([[20, 25]]);
+      expect(result[1].content).toBeUndefined();
     });
   });
 });

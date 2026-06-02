@@ -16,14 +16,17 @@ export interface SearchHit {
 }
 
 export interface SearchMatch {
+  kind?: "match" | "reference";
   file: string;
-  hits: SearchHit[];
+  hits?: SearchHit[];
   content?: string;
   lineRanges: Array<[number, number]>;
   omittedLineRanges?: Array<[number, number]>;
   omittedLines?: number;
-  patterns: string[];
+  patterns?: string[];
   relatedSymbols?: string[];
+  returnedAt?: number;
+  note?: string;
 }
 
 const OMITTED_RANGES_INLINE_CAP = 8;
@@ -473,13 +476,21 @@ export function dedupWindows(
       const [start, end] = match.lineRanges[i];
       const content = contents[i];
 
-      const isSubset = priorForFile.some(
+      const priorCovering = priorForFile.find(
         (prior) => prior.startLine <= start && prior.endLine >= end,
       );
 
-      if (!isSubset) {
+      if (!priorCovering) {
         newRanges.push([start, end]);
         if (content !== undefined) newContents.push(content);
+      } else {
+        result.push({
+          kind: "reference",
+          file: match.file,
+          lineRanges: [[start, end]],
+          returnedAt: priorCovering.returnedAt,
+          note: "Already returned in this session at this line range. Content omitted to save tokens. Re-request via ParecodeExpand if you need it again.",
+        });
       }
     }
 
