@@ -26,10 +26,8 @@ describe("assessPatterns", () => {
 
   it("ignores short patterns for directory collisions", () => {
     const memory = createSessionMemory("test");
-    // "id" is 2 chars, which is < 3
     const result = assessPatterns(["id"], undefined, ["src/identifiers"], memory);
     
-    // It should not return pattern_directory_collision, but will return pattern_too_short
     expect(result.some(r => r.kind === "pattern_directory_collision")).toBe(false);
   });
 
@@ -65,16 +63,13 @@ describe("assessPatterns", () => {
       }]
     };
     
-    // Same pattern and identical paths
     const result1 = assessPatterns(["MiniGame"], ["src/MiniGames"], [], memory);
     expect(result1).toHaveLength(1);
     expect(result1[0].kind).toBe("prior_overflow_recurrence");
     
-    // Different paths -> no warning
     const result2 = assessPatterns(["MiniGame"], ["src/Other"], [], memory);
     expect(result2).toHaveLength(0);
 
-    // Overlapping pattern, identical paths but different order
     const result3 = assessPatterns(["OtherPattern"], ["src/MiniGames"], [], memory);
     expect(result3).toHaveLength(1);
     expect(result3[0].kind).toBe("prior_overflow_recurrence");
@@ -89,7 +84,6 @@ describe("assessPatterns", () => {
           const memory = createSessionMemory("test");
           const result1 = assessPatterns(patterns, undefined, dirs, memory);
           
-          // Add some fake spills to memory
           const memory2: SessionMemory = {
             ...memory,
             spills: [

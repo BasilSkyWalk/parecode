@@ -55,8 +55,6 @@ export class CliAdapter implements ToolHost {
   }
 
   public recordStat(event: any): void {
-    // In CLI mode, we might not have a tracker initialized, or we can just ignore.
-    // Spec: "Tools without session-memory context (e.g. one-off CLI invocations) behave exactly as v0.2"
   }
 
   public async exec(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number | null }> {

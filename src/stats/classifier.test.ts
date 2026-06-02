@@ -18,7 +18,7 @@ describe("classifyToolCalls", () => {
     const records: TranscriptRecord[] = [
       { toolName: "Bash", input: { command: "grep -r foo ." } },
       { toolName: "Bash", input: { command: "find . -name '*.ts' | xargs grep foo" } },
-      { toolName: "Bash", input: { command: "ls -la" } }, // not a search
+      { toolName: "Bash", input: { command: "ls -la" } },
     ];
     expect(classifyToolCalls(records)).toEqual([
       "replaceable_search",
@@ -44,19 +44,19 @@ describe("classifyToolCalls", () => {
     const records: TranscriptRecord[] = [
       { type: "user" },
       { toolName: "Grep" },
-      { toolName: "Read" }, // Follows search in same turn
-      { toolName: "Bash", input: { command: "ls" } }, // Unchanged
-      { toolName: "Read" }, // Still follows search in same turn
-      { type: "user" }, // Next turn boundary
-      { toolName: "Read" }, // No longer follows search in same turn
+      { toolName: "Read" },
+      { toolName: "Bash", input: { command: "ls" } },
+      { toolName: "Read" },
+      { type: "user" },
+      { toolName: "Read" },
     ];
     expect(classifyToolCalls(records)).toEqual([
-      null, // user message
+      null,
       "replaceable_search",
       "read_followups",
       "unchanged",
       "read_followups",
-      null, // user message
+      null,
       "unchanged",
     ]);
   });

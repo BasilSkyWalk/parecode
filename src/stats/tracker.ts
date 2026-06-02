@@ -194,10 +194,9 @@ export class Tracker {
         totalCallsBatched: this.totalCallsBatched,
         totalEstimatedTokensSaved: this.totalEstimatedTokensSaved,
         totalWindowsDedupedAcrossCalls: this.totalWindowsDedupedAcrossCalls,
-        totalSpillsUnconsumed: 0, // Will be computed before write if we can load memory
+        totalSpillsUnconsumed: 0,
       });
 
-      // Compute totalSpillsUnconsumed from session memory
       try {
         const memData = await fs.readFile(path.join(this.sessionDir, `${this.sessionId}.json`), "utf-8");
         const mem = JSON.parse(memData);

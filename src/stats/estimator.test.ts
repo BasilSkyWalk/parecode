@@ -16,12 +16,8 @@ describe("estimateSearchEnvelopeTokens", () => {
       { file: "b.ts", estimatedTokens: 10 },
     ];
     
-    // content tokens = ceil(11/4) + 10 = 3 + 10 = 13
     const tokens = estimateSearchEnvelopeTokens(matches);
     
-    // Envelope: {"status":"success","matches":[{"file":"a.ts","content":""},{"file":"b.ts"}]}
-    // Length is roughly 80 chars -> 20 tokens
-    // Total should be ~33
     expect(tokens).toBeGreaterThan(13);
     expect(tokens).toBeLessThan(50);
   });

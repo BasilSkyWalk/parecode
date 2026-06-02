@@ -617,7 +617,6 @@ describe("SearchEngine", () => {
 
     it("includes summary with top 10 matches by estimatedTokens when matches > 10", async () => {
       const events: RgEvent[] = [];
-      // 12 matches, with lengths increasing so the last 10 are the largest
       for (let i = 1; i <= 12; i++) {
         events.push({ type: "match", file: `f${i}.ts`, line: 1, text: "x".repeat(i * 10) + "\n" });
       }
@@ -630,7 +629,6 @@ describe("SearchEngine", () => {
       expect(result.matches).toHaveLength(12);
       expect(result.summary).toBeDefined();
       expect(result.summary).toHaveLength(10);
-      // The largest files should be f12 to f3
       expect(result.summary![0].file).toBe("f12.ts");
       expect(result.summary![9].file).toBe("f3.ts");
       expect(result.summary![0].estimatedTokens).toBeGreaterThan(result.summary![9].estimatedTokens);
@@ -694,8 +692,8 @@ describe("SearchEngine", () => {
           file: "/foo",
           hits: [],
           lineRanges: [
-            [12, 15], // Subset of [10, 20]
-            [50, 60], // New
+            [12, 15],
+            [50, 60],
           ],
           patterns: ["a"],
           content: "content1\n---\n\ncontent2",

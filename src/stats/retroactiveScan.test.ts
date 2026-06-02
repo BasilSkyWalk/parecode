@@ -51,7 +51,6 @@ describe("runRetroactiveScan", () => {
     }]);
 
     const result = await runRetroactiveScan(3000);
-    // Only new.jsonl should be parsed
     expect(transcriptParser.parseTranscriptFile).toHaveBeenCalledTimes(1);
     expect(transcriptParser.parseTranscriptFile).toHaveBeenCalledWith("/proj1/new.jsonl", false);
     expect(result.sessions).toBe(1);
@@ -64,14 +63,12 @@ describe("runRetroactiveScan", () => {
     vi.mocked(claudeCodeTranscripts.listSessionFiles).mockResolvedValue(["/proj1/file.jsonl"]);
     vi.mocked(fs.stat).mockResolvedValue({ mtimeMs: 5000 } as any);
 
-    // Provide a mix of calls:
-    // 1 search, 1 read followup, 1 edit, 1 unchanged
     vi.mocked(transcriptParser.parseTranscriptFile).mockResolvedValue([
       { type: "user" },
-      { toolName: "Grep", tokens: { input: 10, output: 200 } }, // actual = 200, parecode ~ small env overhead, diff is big
-      { toolName: "Read", tokens: { input: 50, output: 100 } }, // followup: saved 150
-      { toolName: "Edit", tokens: { input: 1000, output: 50 } }, // edit: 1000 * 0.3 = 300
-      { toolName: "Bash", input: { command: "ls" } } // unchanged
+      { toolName: "Grep", tokens: { input: 10, output: 200 } },
+      { toolName: "Read", tokens: { input: 50, output: 100 } },
+      { toolName: "Edit", tokens: { input: 1000, output: 50 } },
+      { toolName: "Bash", input: { command: "ls" } }
     ]);
 
     const result = await runRetroactiveScan(0);
@@ -79,10 +76,6 @@ describe("runRetroactiveScan", () => {
     expect(result.sessions).toBe(1);
     expect(result.toolCalls).toBe(4);
     expect(result.estimatedTokensSaved).toBeGreaterThan(0);
-    // Read followup saves 150
-    // Edit saves 300
-    // Grep saves ~0 (actualTokens is 200, parecode estimation is > 200 because of envelope)
-    // Total is ~450
     expect(result.estimatedTokensSaved).toBe(450);
   });
 });

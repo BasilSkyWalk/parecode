@@ -143,7 +143,7 @@ describe("createDebouncedPersister", () => {
     };
 
     const tmp = await dir({ unsafeCleanup: true });
-    const persister = createDebouncedPersister(testIo, tmp.path, 1000); // long delay
+    const persister = createDebouncedPersister(testIo, tmp.path, 1000);
 
     const m1 = createSessionMemory("s", 1);
     persister.persist(m1);
