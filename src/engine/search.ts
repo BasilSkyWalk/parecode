@@ -152,8 +152,10 @@ export class SearchEngine {
         })
         .sort((a, b) => a.line - b.line);
 
+      const realFile = await this.host.realpath(fr.file);
+
       const match: SearchMatch = {
-        file: fr.file,
+        file: realFile,
         hits,
         content,
         lineRanges,

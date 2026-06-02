@@ -8,6 +8,7 @@ const processStartupId = `${process.pid}-${process.hrtime.bigint().toString()}`;
 
 export class CliAdapter implements ToolHost {
   private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
+  private realpathCache = new Map<string, string>();
 
   public registerTool(spec: ToolSpec, handler: ToolHandler): void {
     this.tools.set(spec.name, { spec, handler });
@@ -63,6 +64,20 @@ export class CliAdapter implements ToolHost {
 
   public async resolveCommand(cmd: string): Promise<string | null> {
     return resolveCommand(cmd);
+  }
+
+  public async realpath(p: string): Promise<string> {
+    if (this.realpathCache.has(p)) {
+      return this.realpathCache.get(p)!;
+    }
+    try {
+      const rp = await fs.realpath(p);
+      this.realpathCache.set(p, rp);
+      return rp;
+    } catch {
+      this.realpathCache.set(p, p);
+      return p;
+    }
   }
 
   public async statFile(filepath: string): Promise<{ mtimeMs: number; size: number }> {

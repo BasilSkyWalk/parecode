@@ -19,6 +19,7 @@ export class McpAdapter implements ToolHost {
   private envelope: EnvelopeLogger;
   private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
   private requestExtra = new AsyncLocalStorage<any>();
+  private realpathCache = new Map<string, string>();
 
   constructor() {
     this.tracker = new Tracker();
@@ -124,6 +125,21 @@ export class McpAdapter implements ToolHost {
         }
       }
     }).catch(() => {});
+  }
+
+  public async realpath(p: string): Promise<string> {
+    if (this.realpathCache.has(p)) {
+      return this.realpathCache.get(p)!;
+    }
+    try {
+      const fs = await import("node:fs/promises");
+      const rp = await fs.realpath(p);
+      this.realpathCache.set(p, rp);
+      return rp;
+    } catch {
+      this.realpathCache.set(p, p);
+      return p;
+    }
   }
 
   public async statFile(path: string): Promise<{ mtimeMs: number; size: number }> {

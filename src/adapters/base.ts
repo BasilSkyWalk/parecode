@@ -22,6 +22,7 @@ export interface ToolHost {
   recordStat(event: any): void;
   exec(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number | null }>;
   resolveCommand(cmd: string): Promise<string | null>;
+  realpath(path: string): Promise<string>;
   statFile(path: string): Promise<{ mtimeMs: number; size: number }>;
   dispatchSubagent(prompt: string, model: string): Promise<SubagentResult>;
   sessionId(): string;

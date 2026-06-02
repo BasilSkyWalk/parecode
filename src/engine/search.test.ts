@@ -35,6 +35,7 @@ const makeHost = (overrides: Partial<ToolHost> = {}): ToolHost => ({
   recordStat: vi.fn(),
   exec: vi.fn(),
   resolveCommand: vi.fn().mockResolvedValue("/usr/bin/rg"),
+  realpath: vi.fn().mockImplementation(async (p: string) => p),
   statFile: vi.fn(),
   ...overrides,
 });

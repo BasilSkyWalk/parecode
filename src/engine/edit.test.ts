@@ -19,6 +19,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 12345, size: 678 }),
     };
 
@@ -50,6 +51,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockRejectedValue(new Error("ENOENT: no such file or directory")),
     };
 
@@ -80,6 +82,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -111,6 +114,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -143,6 +147,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -174,6 +179,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -207,6 +213,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -238,6 +245,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -281,6 +289,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
     };
 
@@ -330,6 +339,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -361,6 +371,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -392,6 +403,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -423,6 +435,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -454,6 +467,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -482,6 +496,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -519,6 +534,7 @@ describe("EditEngine", () => {
       recordStat: vi.fn(),
       exec: vi.fn(),
       resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
       statFile: statMock,
     };
 
@@ -574,6 +590,7 @@ describe("EditEngine", () => {
               recordStat: vi.fn(),
               exec: vi.fn(),
               resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
               statFile: async (p) => {
                 const s = await fs.stat(p);
                 return { mtimeMs: s.mtimeMs, size: s.size };
@@ -633,6 +650,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: async (p) => {
           const s = await fs.stat(p);
           return { mtimeMs: s.mtimeMs, size: s.size };
@@ -686,6 +704,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: async (p) => {
           const s = await fs.stat(p);
           return { mtimeMs: s.mtimeMs, size: s.size };
@@ -734,6 +753,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
@@ -766,6 +786,7 @@ describe("EditEngine", () => {
         recordStat: vi.fn(),
         exec: vi.fn(),
         resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
         statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
       };
 
