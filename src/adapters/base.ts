@@ -24,4 +24,6 @@ export interface ToolHost {
   resolveCommand(cmd: string): Promise<string | null>;
   statFile(path: string): Promise<{ mtimeMs: number; size: number }>;
   dispatchSubagent(prompt: string, model: string): Promise<SubagentResult>;
+  sessionId(): string;
+  sessionDataPath(): string;
 }

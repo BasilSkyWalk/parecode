@@ -3,6 +3,8 @@ import { ExpandEngine } from "./expand.js";
 import { ToolHost } from "../adapters/base.js";
 
 const makeHost = (overrides: Partial<ToolHost> = {}): ToolHost => ({
+  sessionId: vi.fn().mockReturnValue("test-session"),
+  sessionDataPath: vi.fn().mockReturnValue("/tmp"),
   registerTool: vi.fn(),
   dispatchSubagent: vi.fn(),
   readFile: vi.fn(),

@@ -1,0 +1,143 @@
+import * as path from "node:path";
+
+export interface ReturnedWindow {
+  file: string;
+  startLine: number;
+  endLine: number;
+  returnedAt: number;
+  fromCallId: string;
+}
+
+export interface Spill {
+  path: string;
+  createdAt: number;
+  consumed: boolean;
+  fromCallId: string;
+}
+
+export interface PatternWarning {
+  pattern: string;
+  reason: string;
+  raisedAt: number;
+}
+
+export interface SessionMemory {
+  sessionId: string;
+  startedAt: number;
+  returnedWindows: ReturnedWindow[];
+  spills: Spill[];
+  patternWarnings: PatternWarning[];
+}
+
+export interface SessionMemoryIo {
+  readFile(path: string): Promise<string>;
+  writeFile(path: string, content: string): Promise<void>;
+}
+
+export const MAX_RETURNED_WINDOWS = 1024;
+export const MAX_SPILLS = 64;
+
+export function createSessionMemory(sessionId: string, startedAt: number = Date.now()): SessionMemory {
+  return { sessionId, startedAt, returnedWindows: [], spills: [], patternWarnings: [] };
+}
+
+export function recordReturnedWindows(memory: SessionMemory, windows: ReturnedWindow[]): SessionMemory {
+  return {
+    ...memory,
+    returnedWindows: keepNewest([...memory.returnedWindows, ...windows], MAX_RETURNED_WINDOWS),
+  };
+}
+
+export function recordSpill(memory: SessionMemory, spill: Spill): SessionMemory {
+  return {
+    ...memory,
+    spills: keepNewest([...memory.spills, spill], MAX_SPILLS),
+  };
+}
+
+export function recordPatternWarning(memory: SessionMemory, warning: PatternWarning): SessionMemory {
+  return {
+    ...memory,
+    patternWarnings: [...memory.patternWarnings, warning],
+  };
+}
+
+export function sessionFilePath(dir: string, sessionId: string): string {
+  return path.join(dir, `${sessionId}.json`);
+}
+
+export async function load(io: SessionMemoryIo, dir: string, sessionId: string): Promise<SessionMemory> {
+  let raw: string;
+  try {
+    raw = await io.readFile(sessionFilePath(dir, sessionId));
+  } catch {
+    return createSessionMemory(sessionId);
+  }
+  return parseSessionMemory(raw) ?? createSessionMemory(sessionId);
+}
+
+export async function persist(io: SessionMemoryIo, dir: string, memory: SessionMemory): Promise<void> {
+  await io.writeFile(sessionFilePath(dir, memory.sessionId), JSON.stringify(memory));
+}
+
+function keepNewest<T>(items: T[], max: number): T[] {
+  return items.length <= max ? items : items.slice(items.length - max);
+}
+
+function parseSessionMemory(raw: string): SessionMemory | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  return isSessionMemory(data) ? data : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isReturnedWindow(value: unknown): value is ReturnedWindow {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.file === "string" &&
+    typeof value.startLine === "number" &&
+    typeof value.endLine === "number" &&
+    typeof value.returnedAt === "number" &&
+    typeof value.fromCallId === "string"
+  );
+}
+
+function isSpill(value: unknown): value is Spill {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.path === "string" &&
+    typeof value.createdAt === "number" &&
+    typeof value.consumed === "boolean" &&
+    typeof value.fromCallId === "string"
+  );
+}
+
+function isPatternWarning(value: unknown): value is PatternWarning {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.pattern === "string" &&
+    typeof value.reason === "string" &&
+    typeof value.raisedAt === "number"
+  );
+}
+
+function isSessionMemory(value: unknown): value is SessionMemory {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.sessionId === "string" &&
+    typeof value.startedAt === "number" &&
+    Array.isArray(value.returnedWindows) &&
+    value.returnedWindows.every(isReturnedWindow) &&
+    Array.isArray(value.spills) &&
+    value.spills.every(isSpill) &&
+    Array.isArray(value.patternWarnings) &&
+    value.patternWarnings.every(isPatternWarning)
+  );
+}

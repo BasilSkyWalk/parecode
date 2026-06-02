@@ -11,6 +11,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("foo"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -40,6 +42,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn(),
       writeFile: vi.fn(),
       log: vi.fn(),
@@ -68,6 +72,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("const a = 1;\nconst b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -97,6 +103,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("const a = 1;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -127,6 +135,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("foo\nfoo\n"),
       writeFile: vi.fn(),
       log: vi.fn(),
@@ -156,6 +166,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("const   a  = \n 1;\nconst b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -187,6 +199,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("const myVar = 1;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -216,6 +230,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("let a = 1;\nlet b = 2;\n"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -253,6 +269,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockImplementation(async (file: string) => {
         if (file === "test1.ts") return "let a = 1;\nlet b = 2;\n";
         if (file === "test2.ts") return "let c = 3;\n";
@@ -304,6 +322,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("L1\nL2\nL3\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -333,6 +353,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("L1\nL2\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -362,6 +384,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("L1\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -391,6 +415,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("L1\nL2\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -420,6 +446,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("L1\nL2\nL3\nL4\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -446,6 +474,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue("EXTRA\nEXTRA\nL1\nL2\n"),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -481,6 +511,8 @@ describe("EditEngine", () => {
     const mockHost: ToolHost = {
       registerTool: vi.fn(),
       dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
       readFile: vi.fn().mockResolvedValue("let a = 1;"),
       writeFile: vi.fn().mockResolvedValue(undefined),
       log: vi.fn(),
@@ -534,6 +566,8 @@ describe("EditEngine", () => {
             const realHost: ToolHost = {
               registerTool: vi.fn(),
               dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
               readFile: async (p) => fs.readFile(p, "utf-8"),
               writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
               log: vi.fn(),
@@ -581,6 +615,8 @@ describe("EditEngine", () => {
       const realHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: async (p) => {
           const originalContentRead = await fs.readFile(p, "utf-8");
           
@@ -636,6 +672,8 @@ describe("EditEngine", () => {
       const realHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: async (p) => {
           readCount++;
           return fs.readFile(p, "utf-8");
@@ -688,6 +726,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue(`function    hello  (  )   {\n\nreturn   "world"  ;\n\n}`),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),
@@ -718,6 +758,8 @@ describe("EditEngine", () => {
       const mockHost: ToolHost = {
         registerTool: vi.fn(),
         dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
         readFile: vi.fn().mockResolvedValue(`const a = "café";\nconst b = "re\u0301sume\u0301";`),
         writeFile: vi.fn().mockResolvedValue(undefined),
         log: vi.fn(),

@@ -2,17 +2,23 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
+import envPaths from "env-paths";
 import { ToolHost, ToolSpec, ToolHandler, SubagentResult } from "./base.js";
 import { resolveCommand, spawnCommand } from "../infra/spawn.js";
 
 import { Tracker } from "../stats/tracker.js";
 import { EnvelopeLogger } from "../stats/envelope.js";
 
+const processStartupId = `${process.pid}-${process.hrtime.bigint().toString()}`;
+
 export class McpAdapter implements ToolHost {
   private server: Server;
   private tracker: Tracker;
   private envelope: EnvelopeLogger;
   private tools: Map<string, { spec: ToolSpec; handler: ToolHandler }> = new Map();
+  private requestExtra = new AsyncLocalStorage<any>();
 
   constructor() {
     this.tracker = new Tracker();
@@ -32,45 +38,47 @@ export class McpAdapter implements ToolHost {
       };
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const tool = this.tools.get(request.params.name);
-      if (!tool) {
-        throw new Error(`Tool not found: ${request.params.name}`);
-      }
-      const startedAt = Date.now();
-      try {
-        const result = await tool.handler(request.params.arguments);
-        const text = JSON.stringify(result, null, 2);
-        this.envelope.record({
-          toolCall: tool.spec.name,
-          bytesReturned: Buffer.byteLength(text, "utf-8"),
-          durationMs: Date.now() - startedAt,
-          isError: false,
-        }).catch(() => {});
-        return {
-          content: [{ type: "text", text }]
-        };
-      } catch (error) {
-        const err = error as Error;
-        const errorText = `Error: ${err.message}`;
-        this.recordStat({
-          toolCall: tool.spec.name,
-          estimatedNativeTokens: 0,
-          actualTokens: 0,
-          callsBatched: 0,
-          error: err.message,
-        });
-        this.envelope.record({
-          toolCall: tool.spec.name,
-          bytesReturned: Buffer.byteLength(errorText, "utf-8"),
-          durationMs: Date.now() - startedAt,
-          isError: true,
-        }).catch(() => {});
-        return {
-          content: [{ type: "text", text: errorText }],
-          isError: true,
-        };
-      }
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      return this.requestExtra.run(extra, async () => {
+        const tool = this.tools.get(request.params.name);
+        if (!tool) {
+          throw new Error(`Tool not found: ${request.params.name}`);
+        }
+        const startedAt = Date.now();
+        try {
+          const result = await tool.handler(request.params.arguments);
+          const text = JSON.stringify(result, null, 2);
+          this.envelope.record({
+            toolCall: tool.spec.name,
+            bytesReturned: Buffer.byteLength(text, "utf-8"),
+            durationMs: Date.now() - startedAt,
+            isError: false,
+          }).catch(() => {});
+          return {
+            content: [{ type: "text", text }]
+          };
+        } catch (error) {
+          const err = error as Error;
+          const errorText = `Error: ${err.message}`;
+          this.recordStat({
+            toolCall: tool.spec.name,
+            estimatedNativeTokens: 0,
+            actualTokens: 0,
+            callsBatched: 0,
+            error: err.message,
+          });
+          this.envelope.record({
+            toolCall: tool.spec.name,
+            bytesReturned: Buffer.byteLength(errorText, "utf-8"),
+            durationMs: Date.now() - startedAt,
+            isError: true,
+          }).catch(() => {});
+          return {
+            content: [{ type: "text", text: errorText }],
+            isError: true,
+          };
+        }
+      });
     });
   }
 
@@ -157,6 +165,15 @@ export class McpAdapter implements ToolHost {
       status: "unavailable",
       detail: "subagent dispatch is not implemented in the MCP adapter (v1); the host model should invoke its own Task tool",
     };
+  }
+
+  public sessionId(): string {
+    const extra = this.requestExtra.getStore();
+    return extra?.sessionId ?? extra?._meta?.sessionId ?? processStartupId;
+  }
+
+  public sessionDataPath(): string {
+    return path.join(envPaths("parecode").data, "sessions");
   }
 
   public async start(): Promise<void> {

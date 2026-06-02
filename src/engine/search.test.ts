@@ -25,6 +25,8 @@ const toRgJson = (events: RgEvent[]): string =>
     .join("\n");
 
 const makeHost = (overrides: Partial<ToolHost> = {}): ToolHost => ({
+  sessionId: vi.fn().mockReturnValue("test-session"),
+  sessionDataPath: vi.fn().mockReturnValue("/tmp"),
   registerTool: vi.fn(),
   dispatchSubagent: vi.fn(),
   readFile: vi.fn(),
