@@ -8,7 +8,7 @@ export interface ToolSpec {
   };
 }
 
-export type ToolHandler = (args: any) => Promise<unknown>;
+export type ToolHandler = (args: any, extra?: any) => Promise<unknown>;
 
 export type SubagentResult =
   | { status: "unavailable"; detail: string }

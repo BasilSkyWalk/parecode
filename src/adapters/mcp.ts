@@ -46,7 +46,7 @@ export class McpAdapter implements ToolHost {
         }
         const startedAt = Date.now();
         try {
-          const result = await tool.handler(request.params.arguments);
+          const result = await tool.handler(request.params.arguments, extra);
           const text = JSON.stringify(result, null, 2);
           this.envelope.record({
             toolCall: tool.spec.name,

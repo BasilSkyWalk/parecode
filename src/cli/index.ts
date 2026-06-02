@@ -22,7 +22,7 @@ async function serve() {
   const searchEngine = new SearchEngine(adapter);
   adapter.registerTool(
     ParecodeSearchToolSpec,
-    async (args: unknown) => {
+    async (args: unknown, _extra?: unknown) => {
       const searchArgs = args as SearchArgs;
       return await searchEngine.search(searchArgs);
     }
@@ -31,7 +31,7 @@ async function serve() {
   const editEngine = new EditEngine(adapter);
   adapter.registerTool(
     ParecodeEditToolSpec,
-    async (args: unknown) => {
+    async (args: unknown, _extra?: unknown) => {
       const editArgs = args as EditRequest;
       return await editEngine.edit(editArgs);
     }
@@ -40,7 +40,7 @@ async function serve() {
   const expandEngine = new ExpandEngine(adapter);
   adapter.registerTool(
     ParecodeExpandToolSpec,
-    async (args: unknown) => {
+    async (args: unknown, _extra?: unknown) => {
       const expandArgs = args as ExpandArgs;
       return await expandEngine.expand(expandArgs);
     }
