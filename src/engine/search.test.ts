@@ -725,4 +725,83 @@ describe("SearchEngine", () => {
       expect(result[1].content).toBeUndefined();
     });
   });
+
+  describe("spill", () => {
+    const manyFiles = (count: number, bytesPerFile: number): string => {
+      const events: RgEvent[] = [];
+      for (let f = 0; f < count; f++) {
+        events.push({ type: "match", file: `file${f}.ts`, line: 1, text: "x".repeat(bytesPerFile) + "\n" });
+      }
+      return toRgJson(events);
+    };
+
+    it("spills to a file and records it in session memory when over the token threshold", async () => {
+      const writeFile = vi.fn().mockResolvedValue(undefined);
+      const log = vi.fn();
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: manyFiles(80, 1500), stderr: "", code: 0 }),
+        writeFile,
+        log,
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.status).toBe("spilled");
+      expect(result.matches).toBeUndefined();
+      expect(result.estimatedTokens).toBeGreaterThan(20000);
+      expect(result.spillPath).toMatch(/^\/tmp\/parecode-spill-test-session-\d+\.json$/);
+      expect(result.instructions).toContain(result.spillPath!);
+      expect(result.summary).toHaveLength(10);
+
+      const spillWrite = writeFile.mock.calls.find((c) => String(c[0]) === result.spillPath);
+      expect(spillWrite).toBeDefined();
+      const payload = JSON.parse(spillWrite![1]);
+      expect(payload.status).toBe("success");
+      expect(payload.matches).toHaveLength(80);
+
+      const sessionWrite = writeFile.mock.calls.find((c) => String(c[0]) === "/tmp/test-session.json");
+      expect(sessionWrite).toBeDefined();
+      const memory = JSON.parse(sessionWrite![1]);
+      expect(memory.spills).toHaveLength(1);
+      expect(memory.spills[0]).toMatchObject({ path: result.spillPath, consumed: false });
+      expect(memory.spills[0].fromCallId).toContain("test-session");
+
+      expect(log).toHaveBeenCalledWith("info", "search result spilled to file", expect.objectContaining({ spillPath: result.spillPath }));
+    });
+
+    it("returns a summary sorted by estimatedTokens descending", async () => {
+      const events: RgEvent[] = [];
+      for (let f = 0; f < 80; f++) {
+        events.push({ type: "match", file: `file${f}.ts`, line: 1, text: "x".repeat(500 + f * 15) + "\n" });
+      }
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: toRgJson(events), stderr: "", code: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.status).toBe("spilled");
+      const tokens = result.summary!.map((s) => s.estimatedTokens);
+      expect(tokens).toEqual([...tokens].sort((a, b) => b - a));
+    });
+
+    it("does not spill or write files when under the token threshold", async () => {
+      const writeFile = vi.fn().mockResolvedValue(undefined);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout: manyFiles(3, 200), stderr: "", code: 0 }),
+        writeFile,
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      expect(result.status).toBe("success");
+      expect(result.matches).toBeDefined();
+      expect(result.spillPath).toBeUndefined();
+      expect(writeFile).not.toHaveBeenCalled();
+    });
+  });
 });

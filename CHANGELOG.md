@@ -11,6 +11,8 @@ Tool I/O schema breaks bump the major version and require an entry under
 ## [Unreleased]
 
 ### Added
+- Parecode-owned spill path: when a `ParecodeSearch` result exceeds `SPILL_TOKEN_THRESHOLD` (20,000 estimated tokens), the full result is written to a `parecode-spill-*.json` file under the session data dir, the spill is recorded in `sessionMemory.spills`, and the response returns `status: "spilled"` with `spillPath`, `instructions`, and a top-K `summary` instead of the bulky `matches` array. Preempts the host's own response truncation so the spill path is known to Parecode. See [ADR 0007](docs/adr/0007-parecode-owned-spill.md).
+
 ### Changed
 ### Deprecated
 ### Removed

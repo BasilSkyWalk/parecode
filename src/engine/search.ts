@@ -1,6 +1,7 @@
+import * as path from "node:path";
 import { ToolHost } from "../adapters/base.js";
 import { estimateTokens, estimateSearchEnvelopeTokens } from "../stats/estimator.js";
-import { ReturnedWindow } from "./sessionMemory.js";
+import { ReturnedWindow, load, persist, recordSpill } from "./sessionMemory.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -31,13 +32,24 @@ export interface SearchMatch {
 
 const OMITTED_RANGES_INLINE_CAP = 8;
 const INLINE_THRESHOLD = 2048;
+const SPILL_TOKEN_THRESHOLD = 20000;
+const SPILL_SUMMARY_SIZE = 10;
+
+export interface SummaryEntry {
+  file: string;
+  lineRanges: Array<[number, number]>;
+  estimatedTokens: number;
+}
 
 export interface SearchResult {
-  status: "success" | "error";
+  status: "success" | "error" | "spilled";
   detail?: string;
   matches?: SearchMatch[];
   errors?: Array<{ pattern: string; detail: string }>;
   estimatedTokens?: number;
+  summary?: SummaryEntry[];
+  spillPath?: string;
+  instructions?: string;
 }
 
 interface SearchWindow {
@@ -208,17 +220,11 @@ export class SearchEngine {
       callsBatched: matches.length,
     });
 
-    let summary: Array<{ file: string; lineRanges: Array<[number, number]>; estimatedTokens: number }> | undefined;
-    if (matches.length > 10) {
-      summary = [...matchesWithTokens]
-        .sort((a, b) => b.estimatedTokens - a.estimatedTokens)
-        .slice(0, 10)
-        .map(m => ({
-          file: m.file,
-          lineRanges: m.lineRanges,
-          estimatedTokens: m.estimatedTokens
-        }));
+    if (estimatedTokensTotal > SPILL_TOKEN_THRESHOLD) {
+      return await this.spill(matchesWithTokens, errors, estimatedTokensTotal);
     }
+
+    const summary = matchesWithTokens.length > 10 ? topSummary(matchesWithTokens, SPILL_SUMMARY_SIZE) : undefined;
 
     return {
       status: "success",
@@ -226,6 +232,43 @@ export class SearchEngine {
       ...(errors.length > 0 ? { errors } : {}),
       estimatedTokens: estimatedTokensTotal,
       ...(summary ? { summary } : {}),
+    };
+  }
+
+  private async spill(
+    matches: Array<SearchMatch & { estimatedTokens: number }>,
+    errors: Array<{ pattern: string; detail: string }>,
+    estimatedTokens: number,
+  ): Promise<SearchResult> {
+    const createdAt = Date.now();
+    const sessionId = this.host.sessionId();
+    const fromCallId = `${sessionId}-${createdAt}`;
+    const dir = this.host.sessionDataPath();
+    const spillPath = path.join(dir, `parecode-spill-${sessionId}-${createdAt}.json`);
+    const summary = topSummary(matches, SPILL_SUMMARY_SIZE);
+
+    const payload = JSON.stringify({
+      status: "success",
+      matches,
+      ...(errors.length > 0 ? { errors } : {}),
+      estimatedTokens,
+    });
+    await this.host.writeFile(spillPath, payload);
+
+    const memory = await load(this.host, dir, sessionId);
+    await persist(this.host, dir, recordSpill(memory, { path: spillPath, createdAt, consumed: false, fromCallId }));
+
+    this.host.log("info", "search result spilled to file", { spillPath, estimatedTokens });
+
+    return {
+      status: "spilled",
+      spillPath,
+      instructions:
+        `Result was ${estimatedTokens} estimated tokens (over the ${SPILL_TOKEN_THRESHOLD} spill threshold) ` +
+        `and was written to ${spillPath}. Read that file for the full result, or narrow the pattern/paths and search again. ` +
+        `Use ParecodeExpand on a file + range from the summary below to fetch only what you need.`,
+      summary,
+      estimatedTokens,
     };
   }
 
@@ -314,6 +357,13 @@ export class SearchEngine {
     }
     return result;
   }
+}
+
+function topSummary(matches: Array<SearchMatch & { estimatedTokens: number }>, k: number): SummaryEntry[] {
+  return [...matches]
+    .sort((a, b) => b.estimatedTokens - a.estimatedTokens)
+    .slice(0, k)
+    .map((m) => ({ file: m.file, lineRanges: m.lineRanges, estimatedTokens: m.estimatedTokens }));
 }
 
 function normalizePatterns(p: string | string[]): string[] {
