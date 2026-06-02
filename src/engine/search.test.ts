@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows, SearchMatch } from "./search.js";
+import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows, SearchMatch, MatchOrReference } from "./search.js";
 import { ToolHost } from "../adapters/base.js";
 
 interface RgEvent {
@@ -747,6 +747,80 @@ describe("SearchEngine", () => {
       });
       expect(result[1].lineRanges).toEqual([[20, 25]]);
       expect((result[1] as SearchMatch).content).toBeUndefined();
+    });
+
+    it("is idempotent for match results (property)", () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.tuple(fc.nat({ max: 50 }), fc.nat({ max: 50 })).map(([a, b]) => {
+              const start = Math.min(a, b) + 1;
+              const end = Math.max(a, b) + 1;
+              return {
+                kind: "match" as const,
+                file: "/file.ts",
+                lineRanges: [[start, end]] as Array<[number, number]>,
+                patterns: ["x"],
+                hits: [],
+              };
+            }),
+            { maxLength: 5 },
+          ),
+          fc.array(
+            fc.tuple(fc.nat({ max: 50 }), fc.nat({ max: 50 })).map(([a, b]) => {
+              const start = Math.min(a, b) + 1;
+              const end = Math.max(a, b) + 1;
+              return { file: "/file.ts", startLine: start, endLine: end, returnedAt: 123, fromCallId: "abc" };
+            }),
+            { maxLength: 5 },
+          ),
+          fc.nat({ max: 5 }),
+          (matches, history, ctx) => {
+            const pass1 = dedupWindows(matches, history, ctx);
+            const matchesOnly = pass1.filter((m) => m.kind === "match") as SearchMatch[];
+            const pass2 = dedupWindows(matchesOnly, history, ctx);
+            expect(pass2).toEqual(matchesOnly);
+          },
+        ),
+      );
+    });
+
+    it("is order-independent (property)", () => {
+      fc.assert(
+        fc.property(
+          fc.array(fc.tuple(fc.nat({ max: 50 }), fc.nat({ max: 50 })), { maxLength: 5 }).map((tuples) =>
+            tuples.map(([a, b], i) => {
+              const start = Math.min(a, b) + 1;
+              const end = Math.max(a, b) + 1;
+              return {
+                kind: "match" as const,
+                file: `/file${i}.ts`,
+                lineRanges: [[start, end]] as Array<[number, number]>,
+                patterns: ["x"],
+                hits: [],
+              };
+            }),
+          ),
+          fc.array(fc.tuple(fc.nat({ max: 50 }), fc.nat({ max: 50 })), { maxLength: 5 }).map((tuples) =>
+            tuples.map(([a, b]) => {
+              const start = Math.min(a, b) + 1;
+              const end = Math.max(a, b) + 1;
+              return { file: `/file${a % 5}.ts`, startLine: start, endLine: end, returnedAt: 123, fromCallId: "abc" };
+            }),
+          ),
+          fc.nat({ max: 5 }),
+          (matches, history, ctx) => {
+            const shuffled = [...matches].reverse();
+            const pass1 = dedupWindows(matches, history, ctx);
+            const pass2 = dedupWindows(shuffled, history, ctx);
+
+            const sortKey = (m: MatchOrReference) => `${m.file}:${m.kind}:${m.lineRanges[0][0]}`;
+            const sortMatches = (arr: MatchOrReference[]) => [...arr].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+
+            expect(sortMatches(pass1)).toEqual(sortMatches(pass2));
+          },
+        ),
+      );
     });
   });
 
