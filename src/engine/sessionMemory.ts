@@ -57,6 +57,11 @@ export function recordSpill(memory: SessionMemory, spill: Spill): SessionMemory 
   };
 }
 
+export function markSpillConsumed(memory: SessionMemory, path: string): SessionMemory {
+  const spills = memory.spills.map((s) => (s.path === path && !s.consumed ? { ...s, consumed: true } : s));
+  return { ...memory, spills };
+}
+
 export function recordPatternWarning(memory: SessionMemory, warning: PatternWarning): SessionMemory {
   return {
     ...memory,

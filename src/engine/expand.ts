@@ -1,5 +1,6 @@
 import { ToolHost } from "../adapters/base.js";
 import { estimateTokens } from "../stats/estimator.js";
+import { load, persist, markSpillConsumed } from "./sessionMemory.js";
 
 export interface ExpandArgs {
   file: string;
@@ -79,6 +80,17 @@ export class ExpandEngine {
       actualTokens: estimatedTokens,
       callsBatched: 1,
     });
+
+    try {
+      const sessionId = this.host.sessionId();
+      const dir = this.host.sessionDataPath();
+      const memory = await load(this.host, dir, sessionId);
+      if (memory.spills.some((s) => s.path === args.file && !s.consumed)) {
+        await persist(this.host, dir, markSpillConsumed(memory, args.file));
+      }
+    } catch (e) {
+      this.host.log("warn", "failed to mark spill consumed in expand", { error: String(e) });
+    }
 
     return {
       status: "success",

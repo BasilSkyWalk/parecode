@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows } from "./search.js";
+import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows, SearchMatch } from "./search.js";
 import { ToolHost } from "../adapters/base.js";
 
 interface RgEvent {
@@ -124,7 +124,7 @@ describe("SearchEngine", () => {
 
     expect(result.status).toBe("success");
     expect(result.matches).toHaveLength(1);
-    const match = result.matches![0];
+    const match = (result.matches as SearchMatch[])![0];
     expect(match.file).toBe("a.ts");
     expect(match.lineRanges).toEqual([
       [1, 3],
@@ -146,7 +146,7 @@ describe("SearchEngine", () => {
 
     const result = await engine.search({ pattern: "x" });
 
-    expect(result.matches?.map((m) => m.file).sort()).toEqual(["a.ts", "b.ts"]);
+    expect((result.matches as SearchMatch[])?.map((m) => m.file).sort()).toEqual(["a.ts", "b.ts"]);
   });
 
   it("records actualTokens equal to ceil(total content length / 4)", async () => {
@@ -163,7 +163,7 @@ describe("SearchEngine", () => {
 
     const result = await engine.search({ pattern: "x" });
 
-    const expected = result.matches!.reduce(
+    const expected = (result.matches as SearchMatch[])!.reduce(
       (sum, m) => sum + Math.ceil((m.content ?? "").length / 4),
       0,
     );
@@ -201,7 +201,7 @@ describe("SearchEngine", () => {
     });
 
     expect(result.status).toBe("success");
-    const match = result.matches![0];
+    const match = (result.matches as SearchMatch[])![0];
 
     const included = new Set<number>();
     let cursor = match.lineRanges[0][0];
@@ -244,7 +244,7 @@ describe("SearchEngine", () => {
 
     expect(result.status).toBe("success");
     expect(result.matches).toHaveLength(1);
-    expect(result.matches![0].file).toBe("a.ts");
+    expect((result.matches as SearchMatch[])![0].file).toBe("a.ts");
   });
 
   describe("snapshot tests", () => {
@@ -272,7 +272,7 @@ describe("SearchEngine", () => {
 
       expect(result.status).toBe("success");
       expect(result.matches).toHaveLength(1);
-      expect(result.matches![0]).toMatchSnapshot();
+      expect((result.matches as SearchMatch[])![0]).toMatchSnapshot();
     });
   });
 
@@ -331,7 +331,7 @@ describe("SearchEngine", () => {
       const engine = new SearchEngine(host);
 
       const result = await engine.search({ pattern: "needle" });
-      expect(result.matches![0].patterns).toEqual(["needle"]);
+      expect((result.matches as SearchMatch[])![0].patterns).toEqual(["needle"]);
     });
 
     it("merges blocks from different patterns in the same file and unions their patterns lists", async () => {
@@ -352,8 +352,8 @@ describe("SearchEngine", () => {
 
       const result = await engine.search({ pattern: ["alpha", "beta"] });
       expect(result.matches).toHaveLength(1);
-      expect(result.matches![0].patterns).toEqual(["alpha", "beta"]);
-      expect(result.matches![0].lineRanges).toEqual([[5, 6]]);
+      expect((result.matches as SearchMatch[])![0].patterns).toEqual(["alpha", "beta"]);
+      expect((result.matches as SearchMatch[])![0].lineRanges).toEqual([[5, 6]]);
     });
 
     it("reports per-pattern failures in errors[] but keeps successful patterns", async () => {
@@ -407,7 +407,7 @@ describe("SearchEngine", () => {
 
       const result = await engine.search({ pattern: "L" });
       expect(result.matches).toHaveLength(1);
-      const m = result.matches![0];
+      const m = (result.matches as SearchMatch[])![0];
       expect(m.lineRanges).toEqual([[1, 4]]);
       expect(m.content).toBe("L1\nL2\nL3\nL4\n");
     });
@@ -428,7 +428,7 @@ describe("SearchEngine", () => {
 
       const result = await engine.search({ pattern: "L" });
       expect(result.matches).toHaveLength(1);
-      expect(result.matches![0].lineRanges).toEqual([[1, 1], [4, 4]]);
+      expect((result.matches as SearchMatch[])![0].lineRanges).toEqual([[1, 1], [4, 4]]);
       expect(log).toHaveBeenCalledWith("warn", expect.stringContaining("bridge read failed"), expect.any(Object));
     });
   });
@@ -516,7 +516,7 @@ describe("SearchEngine", () => {
       const engine = new SearchEngine(host);
 
       const result = await engine.search({ pattern: "PlayerJoin", relatedSymbols: true });
-      expect(result.matches![0].relatedSymbols).toEqual(["HandlePlayerJoin", "OnPlayerJoin"]);
+      expect((result.matches as SearchMatch[])![0].relatedSymbols).toEqual(["HandlePlayerJoin", "OnPlayerJoin"]);
     });
 
     it("omits relatedSymbols field when opt-in is false", async () => {
@@ -525,7 +525,7 @@ describe("SearchEngine", () => {
       const engine = new SearchEngine(host);
 
       const result = await engine.search({ pattern: "Foo" });
-      expect(result.matches![0].relatedSymbols).toBeUndefined();
+      expect((result.matches as SearchMatch[])![0].relatedSymbols).toBeUndefined();
     });
 
     it("skips short patterns (< 4 chars) when extracting source symbols", async () => {
@@ -534,7 +534,7 @@ describe("SearchEngine", () => {
       const engine = new SearchEngine(host);
 
       const result = await engine.search({ pattern: "X", relatedSymbols: true });
-      expect(result.matches![0].relatedSymbols).toEqual([]);
+      expect((result.matches as SearchMatch[])![0].relatedSymbols).toEqual([]);
     });
 
     it("caps related symbols at 10 per match", () => {
@@ -560,7 +560,7 @@ describe("SearchEngine", () => {
       const result = await engine.search({ pattern: "x" });
 
       expect(result.status).toBe("success");
-      for (const m of result.matches!) {
+      for (const m of (result.matches as SearchMatch[])!) {
         expect(m.content).toBeUndefined();
         expect(m.omittedLineRanges).toContainEqual([1, 1]);
       }
@@ -579,8 +579,8 @@ describe("SearchEngine", () => {
 
       const result = await engine.search({ pattern: "x" });
 
-      const big = result.matches!.find((m) => m.file === "big.ts")!;
-      const small = result.matches!.find((m) => m.file === "small.ts")!;
+      const big = (result.matches as SearchMatch[])!.find((m) => m.file === "big.ts")!;
+      const small = (result.matches as SearchMatch[])!.find((m) => m.file === "small.ts")!;
       expect(big.content).toBeUndefined();
       expect(small.content).toBe("hit\n");
     });
@@ -595,7 +595,7 @@ describe("SearchEngine", () => {
       const result = await engine.search({ pattern: "hit" });
 
       expect(result.status).toBe("success");
-      expect(result.matches![0].content).toBe("hit\n");
+      expect((result.matches as SearchMatch[])![0].content).toBe("hit\n");
     });
   });
 
@@ -638,17 +638,18 @@ describe("SearchEngine", () => {
   });
 
   describe("v0.5: dedupWindows", () => {
-    it("leaves matches unchanged when there is no prior history", () => {
-      const matches = [
-        { file: "a.ts", hits: [], lineRanges: [[1, 5]] as Array<[number, number]>, patterns: ["x"], content: "line1\n" }
+    it("preserves non-overlapping matches", () => {
+      const matches: SearchMatch[] = [
+        { kind: "match", file: "/foo", hits: [], lineRanges: [[10, 20]], patterns: ["a"], content: "a" },
+        { kind: "match", file: "/bar", hits: [], lineRanges: [[10, 20]], patterns: ["b"], content: "b" },
       ];
       const result = dedupWindows(matches, [], 2);
       expect(result).toEqual(matches);
     });
 
     it("emits a reference if a block is completely covered by a prior window", () => {
-      const matches = [
-        { file: "a.ts", hits: [], lineRanges: [[5, 10]] as Array<[number, number]>, patterns: ["x"], content: "lines5-10" }
+      const matches: SearchMatch[] = [
+        { kind: "match", file: "a.ts", hits: [], lineRanges: [[5, 10]], patterns: ["x"], content: "lines5-10" }
       ];
       const history = [
         { file: "a.ts", startLine: 1, endLine: 20, returnedAt: 123, fromCallId: "abc" }
@@ -664,8 +665,8 @@ describe("SearchEngine", () => {
     });
 
     it("keeps a block if it only partially overlaps a prior window", () => {
-      const matches = [
-        { file: "a.ts", hits: [], lineRanges: [[5, 10]] as Array<[number, number]>, patterns: ["x"], content: "lines5-10" }
+      const matches: SearchMatch[] = [
+        { kind: "match", file: "a.ts", hits: [], lineRanges: [[5, 10]], patterns: ["x"], content: "lines5-10" }
       ];
       const history = [
         { file: "a.ts", startLine: 1, endLine: 7, returnedAt: 123, fromCallId: "abc" }
@@ -674,35 +675,58 @@ describe("SearchEngine", () => {
       expect(result).toEqual(matches);
     });
 
-    it("splits blocks correctly when one is covered and the other is not", () => {
-      const matches = [
-        {
-          file: "a.ts",
-          hits: [],
-          lineRanges: [[5, 10], [20, 25]] as Array<[number, number]>,
-          patterns: ["x"],
-          content: "lines5-10\n---\n\nlines20-25"
-        }
+    it("converts a full overlap (subset) to a reference", () => {
+      const matches: SearchMatch[] = [
+        { kind: "match", file: "/foo", hits: [], lineRanges: [[12, 18]], patterns: ["a"], content: "a" },
+        { kind: "match", file: "/bar", hits: [], lineRanges: [[10, 20]], patterns: ["b"], content: "b" },
       ];
       const history = [
-        { file: "a.ts", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
+        { file: "a.ts", startLine: 1, endLine: 20, returnedAt: 123, fromCallId: "abc" }
+      ];
+      const result = dedupWindows(matches, history, 2);
+      expect(result).toEqual(matches);
+    });
+
+    it("preserves ranges that do not overlap but replaces those that do within the same match", () => {
+      const matches: SearchMatch[] = [
+        {
+          kind: "match",
+          file: "/foo",
+          hits: [],
+          lineRanges: [
+            [12, 15], // Subset of [10, 20]
+            [50, 60], // New
+          ],
+          patterns: ["a"],
+          content: "content1\n---\n\ncontent2",
+        },
+      ];
+      const history = [
+        { file: "/foo", startLine: 1, endLine: 15, returnedAt: 123, fromCallId: "abc" }
       ];
       const result = dedupWindows(matches, history, 2);
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
         kind: "reference",
-        file: "a.ts",
-        lineRanges: [[5, 10]],
+        file: "/foo",
+        lineRanges: [[12, 15]],
         returnedAt: 123,
         note: expect.stringContaining("Already returned")
       });
-      expect(result[1].lineRanges).toEqual([[20, 25]]);
-      expect(result[1].content).toBe("lines20-25");
+      expect(result[1]).toEqual({
+        kind: "match",
+        file: "/foo",
+        hits: [],
+        lineRanges: [[50, 60]],
+        patterns: ["a"],
+        content: "content2"
+      });
     });
     
     it("handles omitted content correctly when splitting blocks", () => {
-      const matches = [
+      const matches: SearchMatch[] = [
         {
+          kind: "match",
           file: "a.ts",
           hits: [],
           lineRanges: [[5, 10], [20, 25]] as Array<[number, number]>,
@@ -722,7 +746,7 @@ describe("SearchEngine", () => {
         note: expect.stringContaining("Already returned")
       });
       expect(result[1].lineRanges).toEqual([[20, 25]]);
-      expect(result[1].content).toBeUndefined();
+      expect((result[1] as SearchMatch).content).toBeUndefined();
     });
   });
 

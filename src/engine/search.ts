@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { ToolHost } from "../adapters/base.js";
 import { estimateTokens, estimateSearchEnvelopeTokens } from "../stats/estimator.js";
-import { ReturnedWindow, load, persist, recordSpill } from "./sessionMemory.js";
+import { ReturnedWindow, load, persist, recordSpill, markSpillConsumed } from "./sessionMemory.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -17,7 +17,7 @@ export interface SearchHit {
 }
 
 export interface SearchMatch {
-  kind?: "match" | "reference";
+  kind: "match";
   file: string;
   hits?: SearchHit[];
   content?: string;
@@ -26,9 +26,18 @@ export interface SearchMatch {
   omittedLines?: number;
   patterns?: string[];
   relatedSymbols?: string[];
-  returnedAt?: number;
-  note?: string;
+  estimatedTokens?: number;
 }
+
+export interface SearchReference {
+  kind: "reference";
+  file: string;
+  lineRanges: Array<[number, number]>;
+  returnedAt: number;
+  note: string;
+}
+
+export type MatchOrReference = SearchMatch | SearchReference;
 
 const OMITTED_RANGES_INLINE_CAP = 8;
 const INLINE_THRESHOLD = 2048;
@@ -44,12 +53,22 @@ export interface SummaryEntry {
 export interface SearchResult {
   status: "success" | "error" | "spilled";
   detail?: string;
-  matches?: SearchMatch[];
+  matches?: MatchOrReference[];
   errors?: Array<{ pattern: string; detail: string }>;
   estimatedTokens?: number;
   summary?: SummaryEntry[];
+  warnings?: Array<{
+    kind: "pattern_directory_collision" | "pattern_too_short" | "prior_overflow_recurrence";
+    pattern: string;
+    detail: string;
+  }>;
   spillPath?: string;
   instructions?: string;
+  spillReminder?: {
+    path: string;
+    createdAt: number;
+    instructions: string;
+  };
 }
 
 interface SearchWindow {
@@ -94,6 +113,28 @@ export class SearchEngine {
     const patterns = normalizePatterns(args.pattern);
     const ctx = args.contextLines ?? 2;
     const paths = args.paths && args.paths.length > 0 ? args.paths : ["."];
+
+    let updatedMemory;
+    let sessionId: string;
+    let dir: string;
+    try {
+      sessionId = this.host.sessionId();
+      dir = this.host.sessionDataPath();
+      const memory = await load(this.host, dir, sessionId);
+      updatedMemory = memory;
+      let mutated = false;
+      for (const p of paths) {
+        if (updatedMemory.spills.some((s) => s.path === p && !s.consumed)) {
+          updatedMemory = markSpillConsumed(updatedMemory, p);
+          mutated = true;
+        }
+      }
+      if (mutated) {
+        await persist(this.host, dir, updatedMemory);
+      }
+    } catch (e) {
+      this.host.log("warn", "failed to mark spill consumed in search", { error: String(e) });
+    }
 
     const runs = await Promise.all(
       patterns.map((p) => this.runPattern(rgPath, p, paths, ctx, args.maxBytesPerFile)),
@@ -167,6 +208,7 @@ export class SearchEngine {
       const realFile = await this.host.realpath(fr.file);
 
       const match: SearchMatch = {
+        kind: "match",
         file: realFile,
         hits,
         content,
@@ -226,12 +268,27 @@ export class SearchEngine {
 
     const summary = matchesWithTokens.length > 10 ? topSummary(matchesWithTokens, SPILL_SUMMARY_SIZE) : undefined;
 
+    let spillReminder;
+    if (updatedMemory) {
+      const unconsumedSpills = updatedMemory.spills.filter((s) => !s.consumed && Date.now() - s.createdAt > 30000);
+      if (unconsumedSpills.length > 0) {
+        const spill = unconsumedSpills[unconsumedSpills.length - 1];
+        const seconds = Math.floor((Date.now() - spill.createdAt) / 1000);
+        spillReminder = {
+          path: spill.path,
+          createdAt: spill.createdAt,
+          instructions: `Prior spill at ${spill.path} (${seconds}s ago) was never consumed. If you no longer\nneed it, ignore this. If you do, read it now per the instructions in its\noriginating tool result, rather than re-running a broader search.`,
+        };
+      }
+    }
+
     return {
       status: "success",
       matches: matchesWithTokens,
       ...(errors.length > 0 ? { errors } : {}),
       estimatedTokens: estimatedTokensTotal,
       ...(summary ? { summary } : {}),
+      ...(spillReminder ? { spillReminder } : {}),
     };
   }
 
@@ -260,6 +317,18 @@ export class SearchEngine {
 
     this.host.log("info", "search result spilled to file", { spillPath, estimatedTokens });
 
+    const unconsumedSpills = memory.spills.filter((s) => !s.consumed && Date.now() - s.createdAt > 30000);
+    let spillReminder;
+    if (unconsumedSpills.length > 0) {
+      const s = unconsumedSpills[unconsumedSpills.length - 1];
+      const seconds = Math.floor((Date.now() - s.createdAt) / 1000);
+      spillReminder = {
+        path: s.path,
+        createdAt: s.createdAt,
+        instructions: `Prior spill at ${s.path} (${seconds}s ago) was never consumed. If you no longer\nneed it, ignore this. If you do, read it now per the instructions in its\noriginating tool result, rather than re-running a broader search.`,
+      };
+    }
+
     return {
       status: "spilled",
       spillPath,
@@ -269,6 +338,7 @@ export class SearchEngine {
         `Use ParecodeExpand on a file + range from the summary below to fetch only what you need.`,
       summary,
       estimatedTokens,
+      ...(spillReminder ? { spillReminder } : {}),
     };
   }
 
@@ -525,8 +595,8 @@ export function dedupWindows(
   matches: SearchMatch[],
   returnedWindows: ReturnedWindow[],
   contextLines: number,
-): SearchMatch[] {
-  const result: SearchMatch[] = [];
+): MatchOrReference[] {
+  const result: MatchOrReference[] = [];
 
   for (const match of matches) {
     const priorForFile = returnedWindows.filter((w) => w.file === match.file);

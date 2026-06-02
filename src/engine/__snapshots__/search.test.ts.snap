@@ -25,6 +25,7 @@ Line 21 content to take up space.
       "matchText": "Line 20 content to take up space.",
     },
   ],
+  "kind": "match",
   "lineRanges": [
     [
       8,
