@@ -11,6 +11,8 @@ export const ParecodeSearchToolSpec: ToolSpec = {
     "`estimatedTokens` so you can budget before consuming. Read-only: to widen a match use ParecodeExpand, " +
     "to change code use ParecodeEdit. Per-file content over ~2KB is dropped (its lines listed in " +
     "`omittedLineRanges`) to protect context — widen those via ParecodeExpand instead of re-reading the file. " +
+    "Repeated calls in the same session are token-efficient: previously-returned windows return as `kind: 'reference'` placeholders. " +
+    "Watch the `warnings` field — a `pattern_directory_collision` almost always means narrow the pattern before retrying. " +
     "Needs ripgrep on PATH (run `parecode doctor` if missing). In CodeGraph repos (.codegraph/), prefer " +
     "codegraph_explore for broad 'how does X work?' questions; this stays best for targeted multi-pattern lookups.",
   inputSchema: {

@@ -9,6 +9,7 @@ export interface ToolCallRecord {
   estimatedNativeTokens: number;
   actualTokens: number;
   callsBatched: number;
+  windowsDedupedAcrossCalls?: number;
   error?: string;
 }
 
@@ -24,6 +25,7 @@ export interface SessionRollup {
   totalCalls: number;
   totalCallsBatched: number;
   totalEstimatedTokensSaved: number;
+  totalWindowsDedupedAcrossCalls: number;
 }
 
 export async function loadRollupWithInflight(
@@ -66,6 +68,7 @@ export async function loadRollupWithInflight(
     let totalCalls = 0;
     let totalCallsBatched = 0;
     let totalEstimatedTokensSaved = 0;
+    let totalWindowsDedupedAcrossCalls = 0;
 
     for (const line of lines) {
       try {
@@ -73,6 +76,7 @@ export async function loadRollupWithInflight(
         totalCalls += 1;
         totalCallsBatched += record.callsBatched || 0;
         totalEstimatedTokensSaved += record.estimatedTokensSaved || 0;
+        totalWindowsDedupedAcrossCalls += record.windowsDedupedAcrossCalls || 0;
         if (!startTime || record.timestamp < startTime) startTime = record.timestamp;
         if (!endTime || record.timestamp > endTime) endTime = record.timestamp;
       } catch {}
@@ -86,6 +90,7 @@ export async function loadRollupWithInflight(
         totalCalls,
         totalCallsBatched,
         totalEstimatedTokensSaved,
+        totalWindowsDedupedAcrossCalls,
       });
       inflightCount++;
     }
@@ -106,6 +111,7 @@ export class Tracker {
   private totalCalls: number = 0;
   private totalCallsBatched: number = 0;
   private totalEstimatedTokensSaved: number = 0;
+  private totalWindowsDedupedAcrossCalls: number = 0;
   private logErrorEmitted: boolean = false;
 
   constructor() {
@@ -130,6 +136,7 @@ export class Tracker {
   public async record(record: ToolCallRecord): Promise<void> {
     this.totalCalls += 1;
     this.totalCallsBatched += record.callsBatched;
+    this.totalWindowsDedupedAcrossCalls += record.windowsDedupedAcrossCalls || 0;
     const estimatedTokensSaved = record.estimatedNativeTokens - record.actualTokens;
     this.totalEstimatedTokensSaved += estimatedTokensSaved;
 
@@ -174,6 +181,7 @@ export class Tracker {
         totalCalls: this.totalCalls,
         totalCallsBatched: this.totalCallsBatched,
         totalEstimatedTokensSaved: this.totalEstimatedTokensSaved,
+        totalWindowsDedupedAcrossCalls: this.totalWindowsDedupedAcrossCalls,
       });
 
       await fs.writeFile(this.rollupFile, JSON.stringify(rollup, null, 2), "utf-8");
