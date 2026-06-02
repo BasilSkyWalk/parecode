@@ -903,4 +903,53 @@ describe("SearchEngine", () => {
       expect(spillWrites).toHaveLength(0);
     });
   });
+
+  describe("integration: real tmp-dir session memory", () => {
+    it("two consecutive searches collapse overlap to references", async () => {
+      const { dir } = await import("tmp-promise");
+      const fs = await import("node:fs/promises");
+      const tmp = await dir({ unsafeCleanup: true });
+
+      const stdout1 = toRgJson([
+        { type: "match", file: "/real/a.ts", line: 5, text: "hit1\n" },
+        { type: "match", file: "/real/a.ts", line: 6, text: "hit2\n" },
+      ]);
+      const stdout2 = toRgJson([
+        { type: "match", file: "/real/a.ts", line: 5, text: "hit1\n" },
+        { type: "match", file: "/real/b.ts", line: 10, text: "hit3\n" },
+      ]);
+
+      const exec = vi.fn()
+        .mockResolvedValueOnce({ stdout: stdout1, stderr: "", code: 0 })
+        .mockResolvedValueOnce({ stdout: stdout2, stderr: "", code: 0 });
+
+      const host = makeHost({
+        sessionDataPath: vi.fn().mockReturnValue(tmp.path),
+        exec,
+        readFile: async (p) => fs.readFile(p, "utf-8"),
+        writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
+      });
+
+      const engine = new SearchEngine(host);
+
+      const res1 = await engine.search({ pattern: "hit" });
+      expect(res1.status).toBe("success");
+      expect(res1.matches).toHaveLength(1);
+      expect((res1.matches as SearchMatch[])![0].kind).toBe("match");
+
+      const res2 = await engine.search({ pattern: "hit" });
+      expect(res2.status).toBe("success");
+      expect(res2.matches).toHaveLength(2);
+
+      const ref = res2.matches!.find((m) => m.file === "/real/a.ts");
+      expect(ref).toBeDefined();
+      expect(ref!.kind).toBe("reference");
+
+      const match = res2.matches!.find((m) => m.file === "/real/b.ts");
+      expect(match).toBeDefined();
+      expect(match!.kind).toBe("match");
+
+      await tmp.cleanup();
+    });
+  });
 });

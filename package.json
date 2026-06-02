@@ -55,6 +55,7 @@
   "devDependencies": {
     "@types/env-paths": "^1.0.2",
     "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.8",
     "fast-check": "^4.8.0",
     "tmp-promise": "^3.0.3",
     "typescript": "^6.0.3",
