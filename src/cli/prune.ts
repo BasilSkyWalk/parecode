@@ -43,7 +43,7 @@ export async function pruneCommand(args: string[]) {
   try {
     const files = await fs.readdir(sessionDir);
     for (const file of files) {
-      if (file.endsWith(".jsonl")) {
+      if (file.endsWith(".jsonl") || (file.endsWith(".json") && file !== "index.json")) {
         const filePath = path.join(sessionDir, file);
         try {
           const stats = await fs.stat(filePath);

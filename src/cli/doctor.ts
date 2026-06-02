@@ -132,7 +132,24 @@ async function reportTranscripts(): Promise<void> {
   }
 }
 
-export async function doctorCommand() {
+export async function doctorCommand(args: string[] = []) {
+  if (args.includes("--reset")) {
+    const dataDir = envPaths("parecode").data;
+    const sessionDir = path.join(dataDir, "sessions");
+    let deletedCount = 0;
+    try {
+      const files = await fs.readdir(sessionDir);
+      for (const file of files) {
+        if (file.endsWith(".json") && file !== "index.json") {
+          await fs.unlink(path.join(sessionDir, file));
+          deletedCount++;
+        }
+      }
+    } catch {}
+    process.stdout.write(`Reset ${deletedCount} session memory file(s).\n`);
+    return;
+  }
+
   process.stdout.write("Parecode Doctor\n");
   process.stdout.write("───────────────\n\n");
 

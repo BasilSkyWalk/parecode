@@ -75,7 +75,7 @@ async function main() {
       await pruneCommand(args.slice(1));
       break;
     case "doctor":
-      await doctorCommand();
+      await doctorCommand(args.slice(1));
       break;
     case "flush":
       await flushCommand();
