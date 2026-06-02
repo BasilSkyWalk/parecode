@@ -15,6 +15,8 @@ export interface RetroactiveScanResult {
   toolCalls: number;
   callsBatched: number;
   estimatedTokensSaved: number;
+  windowsDedupedAcrossCalls?: number;
+  spillsUnconsumed?: number;
 }
 
 export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string, includeContent = false): Promise<RetroactiveScanResult> {
@@ -23,6 +25,8 @@ export async function runRetroactiveScan(cutoffMs: number, snapshotDir?: string,
     toolCalls: 0,
     callsBatched: 0,
     estimatedTokensSaved: 0,
+    windowsDedupedAcrossCalls: 0,
+    spillsUnconsumed: 0,
   };
 
   if (!(await transcriptDirExists())) {

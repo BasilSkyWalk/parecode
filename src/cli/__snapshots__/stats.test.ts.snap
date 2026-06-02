@@ -7,6 +7,8 @@ exports[`statsCommand > prints 7d stats as json 1`] = `
   "callsBatched": 6,
   "estimatedTokensSavedLowerBound": 2000,
   "estimatedTokensSavedUpperBound": 6000,
+  "windowsDedupedAcrossCalls": 0,
+  "spillsUnconsumed": 0,
   "since": "7d"
 }
 "
@@ -18,6 +20,8 @@ exports[`statsCommand > prints 30d stats as text 1`] = `
 Sessions:                         3
 Tool calls:                      35
 Calls batched (est):             16
+Windows deduped:                  0
+Spills unconsumed:                0
 Tokens saved (lower-bound est): 5,333
 
 * Lower-bound assumes a realistic baseline (model would do targeted reads,
@@ -32,6 +36,8 @@ exports[`statsCommand > prints default 7d stats as text 1`] = `
 Sessions:                         2
 Tool calls:                      15
 Calls batched (est):              6
+Windows deduped:                  0
+Spills unconsumed:                0
 Tokens saved (lower-bound est): 2,000
 
 * Lower-bound assumes a realistic baseline (model would do targeted reads,
@@ -47,6 +53,8 @@ exports[`statsCommand > prints retroactive stats as json 1`] = `
   "callsBatched": 20,
   "estimatedTokensSavedLowerBound": 4115,
   "estimatedTokensSavedUpperBound": 12345,
+  "windowsDedupedAcrossCalls": 0,
+  "spillsUnconsumed": 0,
   "since": "30d",
   "retroactive": true
 }
@@ -59,6 +67,8 @@ exports[`statsCommand > prints retroactive stats as text 1`] = `
 Sessions:                         5
 Tool calls:                      42
 Calls batched (est):             20
+Windows deduped:                N/A
+Spills unconsumed:              N/A
 Tokens saved (lower-bound est): 4,115
 
 * Lower-bound assumes a realistic baseline (model would do targeted reads,

@@ -39,3 +39,24 @@ export function estimateSearchEnvelopeTokens(
   const envelopeTokens = estimateTokens(JSON.stringify(envelope));
   return perMatchTokens + envelopeTokens;
 }
+
+/**
+ * Estimates the token count of content that was omitted due to deduplication
+ * into SearchReference blocks. This prevents double-crediting "tokens saved"
+ * for content that was truncated purely due to dedup rather than original
+ * text-truncation.
+ */
+export function estimateReferenceTokens(
+  matches: Array<{ kind?: string; lineRanges?: Array<[number, number]> }>
+): number {
+  let lines = 0;
+  for (const m of matches) {
+    if (m.kind === "reference" && m.lineRanges) {
+      for (const [start, end] of m.lineRanges) {
+        lines += Math.max(0, end - start + 1);
+      }
+    }
+  }
+  // Rough heuristic: ~40 chars per line on average, 4 chars per token => 10 tokens/line
+  return lines * 10;
+}

@@ -58,6 +58,8 @@ export async function statsCommand(args: string[]) {
   let totalCalls = 0;
   let totalCallsBatched = 0;
   let totalEstimatedTokensSaved = 0;
+  let totalWindowsDedupedAcrossCalls = 0;
+  let totalSpillsUnconsumed = 0;
 
   const dataDir = process.env.PARECODE_DATA_DIR || envPaths("parecode").data;
 
@@ -74,6 +76,8 @@ export async function statsCommand(args: string[]) {
     totalCalls = retroResult.toolCalls;
     totalCallsBatched = retroResult.callsBatched;
     totalEstimatedTokensSaved = retroResult.estimatedTokensSaved;
+    totalWindowsDedupedAcrossCalls = retroResult.windowsDedupedAcrossCalls || 0;
+    totalSpillsUnconsumed = retroResult.spillsUnconsumed || 0;
   } else {
     const sessionDir = path.join(dataDir, "sessions");
 
@@ -86,6 +90,8 @@ export async function statsCommand(args: string[]) {
       totalCalls += s.totalCalls || 0;
       totalCallsBatched += s.totalCallsBatched || 0;
       totalEstimatedTokensSaved += s.totalEstimatedTokensSaved || 0;
+      totalWindowsDedupedAcrossCalls += s.totalWindowsDedupedAcrossCalls || 0;
+      totalSpillsUnconsumed += s.totalSpillsUnconsumed || 0;
     }
   }
 
@@ -100,6 +106,8 @@ export async function statsCommand(args: string[]) {
       callsBatched: totalCallsBatched,
       estimatedTokensSavedLowerBound: tokensSavedLowerBound,
       estimatedTokensSavedUpperBound: totalEstimatedTokensSaved,
+      windowsDedupedAcrossCalls: totalWindowsDedupedAcrossCalls,
+      spillsUnconsumed: totalSpillsUnconsumed,
       since: sinceStr,
       ...(retroactive ? { retroactive: true } : {})
     }, null, 2) + "\n");
@@ -109,6 +117,8 @@ export async function statsCommand(args: string[]) {
     process.stdout.write(`Sessions:                    ${totalSessions.toLocaleString().padStart(6)}\n`);
     process.stdout.write(`Tool calls:                  ${totalCalls.toLocaleString().padStart(6)}\n`);
     process.stdout.write(`Calls batched (est):         ${totalCallsBatched.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`Windows deduped:             ${retroactive ? "   N/A" : totalWindowsDedupedAcrossCalls.toLocaleString().padStart(6)}\n`);
+    process.stdout.write(`Spills unconsumed:           ${retroactive ? "   N/A" : totalSpillsUnconsumed.toLocaleString().padStart(6)}\n`);
     process.stdout.write(`${tokensSavedLabel.padEnd(29)}${tokensSavedShown.toLocaleString().padStart(6)}\n`);
     if (!showUpperBound) {
       process.stdout.write(`\n* Lower-bound assumes a realistic baseline (model would do targeted reads,\n`);

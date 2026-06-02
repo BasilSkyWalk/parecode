@@ -825,7 +825,8 @@ describe("SearchEngine", () => {
       expect(result.status).toBe("success");
       expect(result.matches).toBeDefined();
       expect(result.spillPath).toBeUndefined();
-      expect(writeFile).not.toHaveBeenCalled();
+      const spillWrites = writeFile.mock.calls.filter((c) => String(c[0]).includes("spill"));
+      expect(spillWrites).toHaveLength(0);
     });
   });
 });

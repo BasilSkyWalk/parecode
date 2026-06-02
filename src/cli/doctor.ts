@@ -148,8 +148,14 @@ export async function doctorCommand() {
   const dataDir = envPaths("parecode").data;
   const sessionDir = path.join(dataDir, "sessions");
   const size = await getDirSize(sessionDir);
+  let memCount = 0;
+  try {
+    const files = await fs.readdir(sessionDir);
+    memCount = files.filter((f) => f.endsWith(".json") && f !== "index.json").length;
+  } catch {}
   process.stdout.write(`Data Dir:      ${dataDir}\n`);
   process.stdout.write(`Log Size:      ${formatBytes(size)}\n`);
+  process.stdout.write(`Session Mem:   ${memCount} files at ${sessionDir}\n`);
 
   const claudePath = await resolveCommand("claude");
   if (claudePath) {

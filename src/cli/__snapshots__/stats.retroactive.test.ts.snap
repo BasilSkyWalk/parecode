@@ -6,6 +6,8 @@ exports[`statsCommand --retroactive integration > prints retroactive stats corre
 Sessions:                         2
 Tool calls:                       5
 Calls batched (est):              0
+Windows deduped:                N/A
+Spills unconsumed:              N/A
 Tokens saved (lower-bound est):   280
 
 * Lower-bound assumes a realistic baseline (model would do targeted reads,

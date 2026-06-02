@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { ToolHost } from "../adapters/base.js";
-import { estimateTokens, estimateSearchEnvelopeTokens } from "../stats/estimator.js";
-import { ReturnedWindow, load, persist, recordSpill, markSpillConsumed } from "./sessionMemory.js";
+import { estimateTokens, estimateSearchEnvelopeTokens, estimateReferenceTokens } from "../stats/estimator.js";
+import { ReturnedWindow, load, persist, recordSpill, markSpillConsumed, recordReturnedWindows } from "./sessionMemory.js";
 
 export interface SearchArgs {
   pattern: string | string[];
@@ -115,11 +115,9 @@ export class SearchEngine {
     const paths = args.paths && args.paths.length > 0 ? args.paths : ["."];
 
     let updatedMemory;
-    let sessionId: string;
-    let dir: string;
+    const sessionId: string = this.host.sessionId();
+    const dir: string = this.host.sessionDataPath();
     try {
-      sessionId = this.host.sessionId();
-      dir = this.host.sessionDataPath();
       const memory = await load(this.host, dir, sessionId);
       updatedMemory = memory;
       let mutated = false;
@@ -243,14 +241,19 @@ export class SearchEngine {
       }),
     );
 
-    const matchesWithTokens = matches.map((m) => ({ ...m, estimatedTokens: m.content ? estimateTokens(m.content) : 0 }));
+    const matchesDeduped = updatedMemory ? dedupWindows(matches, updatedMemory.returnedWindows, ctx) : matches;
+
+    const matchesWithTokens = matchesDeduped.map((m) => ({ ...m, estimatedTokens: m.kind === "match" && m.content ? estimateTokens(m.content) : 0 }));
 
     const estimatedTokensTotal = estimateSearchEnvelopeTokens(
-      matchesWithTokens,
+      matchesWithTokens as Array<{ content?: string; estimatedTokens?: number }>,
       errors,
     );
 
     const actualTokens = matchesWithTokens.reduce((s, m) => s + m.estimatedTokens, 0);
+
+    const windowsDedupedAcrossCalls = matchesDeduped.filter(m => m.kind === "reference").length;
+    const tokensDeduped = estimateReferenceTokens(matchesDeduped);
 
     this.host.recordStat({
       toolCall: "ParecodeSearch",
@@ -260,13 +263,32 @@ export class SearchEngine {
       estimatedNativeTokens,
       actualTokens,
       callsBatched: matches.length,
+      windowsDedupedAcrossCalls,
+      tokensDeduped,
     });
 
     if (estimatedTokensTotal > SPILL_TOKEN_THRESHOLD) {
-      return await this.spill(matchesWithTokens, errors, estimatedTokensTotal);
+      return await this.spill(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, errors, estimatedTokensTotal);
     }
 
-    const summary = matchesWithTokens.length > 10 ? topSummary(matchesWithTokens, SPILL_SUMMARY_SIZE) : undefined;
+    if (updatedMemory && matchesWithTokens.length > 0) {
+      const now = Date.now();
+      const callId = `${sessionId}-${now}`;
+      const returned: ReturnedWindow[] = [];
+      for (const m of matchesWithTokens) {
+        if (m.kind === "match") {
+          for (const [s, e] of m.lineRanges) {
+            returned.push({ file: m.file, startLine: s, endLine: e, returnedAt: now, fromCallId: callId });
+          }
+        }
+      }
+      if (returned.length > 0) {
+        updatedMemory = recordReturnedWindows(updatedMemory, returned);
+        await persist(this.host, dir, updatedMemory).catch(() => {});
+      }
+    }
+
+    const summary = matchesWithTokens.length > 10 ? topSummary(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, SPILL_SUMMARY_SIZE) : undefined;
 
     let spillReminder;
     if (updatedMemory) {

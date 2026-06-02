@@ -10,6 +10,7 @@ export interface ToolCallRecord {
   actualTokens: number;
   callsBatched: number;
   windowsDedupedAcrossCalls?: number;
+  tokensDeduped?: number;
   error?: string;
 }
 
@@ -26,6 +27,7 @@ export interface SessionRollup {
   totalCallsBatched: number;
   totalEstimatedTokensSaved: number;
   totalWindowsDedupedAcrossCalls: number;
+  totalSpillsUnconsumed: number;
 }
 
 export async function loadRollupWithInflight(
@@ -69,6 +71,7 @@ export async function loadRollupWithInflight(
     let totalCallsBatched = 0;
     let totalEstimatedTokensSaved = 0;
     let totalWindowsDedupedAcrossCalls = 0;
+    let totalSpillsUnconsumed = 0;
 
     for (const line of lines) {
       try {
@@ -82,6 +85,14 @@ export async function loadRollupWithInflight(
       } catch {}
     }
 
+    try {
+      const memData = await fs.readFile(path.join(sessionDir, `${sessionId}.json`), "utf-8");
+      const mem = JSON.parse(memData);
+      if (mem && Array.isArray(mem.spills)) {
+        totalSpillsUnconsumed = mem.spills.filter((s: any) => !s.consumed).length;
+      }
+    } catch {}
+
     if (totalCalls > 0) {
       rollup.push({
         sessionId,
@@ -91,6 +102,7 @@ export async function loadRollupWithInflight(
         totalCallsBatched,
         totalEstimatedTokensSaved,
         totalWindowsDedupedAcrossCalls,
+        totalSpillsUnconsumed,
       });
       inflightCount++;
     }
@@ -137,7 +149,7 @@ export class Tracker {
     this.totalCalls += 1;
     this.totalCallsBatched += record.callsBatched;
     this.totalWindowsDedupedAcrossCalls += record.windowsDedupedAcrossCalls || 0;
-    const estimatedTokensSaved = record.estimatedNativeTokens - record.actualTokens;
+    const estimatedTokensSaved = Math.max(0, record.estimatedNativeTokens - record.actualTokens - (record.tokensDeduped || 0));
     this.totalEstimatedTokensSaved += estimatedTokensSaved;
 
     const fullRecord: SessionRecord = {
@@ -182,7 +194,17 @@ export class Tracker {
         totalCallsBatched: this.totalCallsBatched,
         totalEstimatedTokensSaved: this.totalEstimatedTokensSaved,
         totalWindowsDedupedAcrossCalls: this.totalWindowsDedupedAcrossCalls,
+        totalSpillsUnconsumed: 0, // Will be computed before write if we can load memory
       });
+
+      // Compute totalSpillsUnconsumed from session memory
+      try {
+        const memData = await fs.readFile(path.join(this.sessionDir, `${this.sessionId}.json`), "utf-8");
+        const mem = JSON.parse(memData);
+        if (mem && Array.isArray(mem.spills)) {
+          rollup[rollup.length - 1].totalSpillsUnconsumed = mem.spills.filter((s: any) => !s.consumed).length;
+        }
+      } catch {}
 
       await fs.writeFile(this.rollupFile, JSON.stringify(rollup, null, 2), "utf-8");
     } catch (err) {
