@@ -950,4 +950,84 @@ describe("SearchEngine", () => {
       await tmp.cleanup();
     });
   });
+
+  describe("v0.5: pattern pre-flight warnings", () => {
+    it("emits pattern_directory_collision and logs a warning when a pattern matches a directory name", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "MiniGameService\n" }]);
+      const log = vi.fn();
+      const listDirs = vi.fn().mockResolvedValue(["/repo/MiniGames"]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+        listDirs,
+        log,
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "MiniGame", paths: ["/repo"] });
+
+      expect(listDirs).toHaveBeenCalledWith("/repo", 2);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings!.some((w) => w.kind === "pattern_directory_collision")).toBe(true);
+      expect(log).toHaveBeenCalledWith(
+        "warn",
+        "pattern pre-flight warning",
+        expect.objectContaining({ kind: "pattern_directory_collision", pattern: "MiniGame" }),
+      );
+    });
+
+    it("omits warnings for a specific pattern with no directory collision", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hit\n" }]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+        listDirs: vi.fn().mockResolvedValue(["/repo/MiniGames"]),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "AlbumSlottingCoordinator", paths: ["/repo"] });
+
+      expect(result.warnings).toBeUndefined();
+    });
+
+    it("flags a too-short pattern", async () => {
+      const stdout = toRgJson([{ type: "match", file: "a.ts", line: 1, text: "hit\n" }]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "id" });
+
+      expect(result.warnings!.some((w) => w.kind === "pattern_too_short")).toBe(true);
+    });
+
+    it("records patterns/paths on spill so a repeat search warns prior_overflow_recurrence", async () => {
+      const fs = await import("node:fs/promises");
+      const { dir } = await import("tmp-promise");
+      const tmp = await dir({ unsafeCleanup: true });
+
+      const events: RgEvent[] = [];
+      for (let f = 0; f < 80; f++) {
+        events.push({ type: "match", file: `file${f}.ts`, line: 1, text: "x".repeat(1500) + "\n" });
+      }
+      const stdout = toRgJson(events);
+
+      const host = makeHost({
+        sessionDataPath: vi.fn().mockReturnValue(tmp.path),
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+        readFile: async (p) => fs.readFile(p, "utf-8"),
+        writeFile: async (p, c) => fs.writeFile(p, c, "utf-8"),
+      });
+      const engine = new SearchEngine(host);
+
+      const res1 = await engine.search({ pattern: "MiniGameController" });
+      expect(res1.status).toBe("spilled");
+      expect(res1.warnings).toBeUndefined();
+
+      const res2 = await engine.search({ pattern: "MiniGameController" });
+      expect(res2.warnings).toBeDefined();
+      expect(res2.warnings!.some((w) => w.kind === "prior_overflow_recurrence")).toBe(true);
+
+      await tmp.cleanup();
+    });
+  });
 });
