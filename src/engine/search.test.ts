@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import { SearchEngine, planMerges, findRelatedSymbols, dedupWindows, SearchMatch, MatchOrReference } from "./search.js";
 import { ToolHost } from "../adapters/base.js";
+import path from "node:path";
 
 interface RgEvent {
   type: "match" | "context";
@@ -846,7 +847,8 @@ describe("SearchEngine", () => {
       expect(result.status).toBe("spilled");
       expect(result.matches).toBeUndefined();
       expect(result.estimatedTokens).toBeGreaterThan(20000);
-      expect(result.spillPath).toMatch(/^\/tmp\/parecode-spill-test-session-\d+\.json$/);
+      expect(path.basename(result.spillPath!)).toMatch(/^parecode-spill-test-session-\d+\.json$/);
+      expect(path.dirname(result.spillPath!)).toBe(path.join("/tmp"));
       expect(result.instructions).toContain(result.spillPath!);
       expect(result.summary).toHaveLength(10);
 
@@ -856,7 +858,7 @@ describe("SearchEngine", () => {
       expect(payload.status).toBe("success");
       expect(payload.matches).toHaveLength(80);
 
-      const sessionWrite = writeFile.mock.calls.find((c) => String(c[0]) === "/tmp/test-session.json");
+      const sessionWrite = writeFile.mock.calls.find((c) => String(c[0]) === path.join("/tmp", "test-session.json"));
       expect(sessionWrite).toBeDefined();
       const memory = JSON.parse(sessionWrite![1]);
       expect(memory.spills).toHaveLength(1);

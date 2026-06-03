@@ -67,7 +67,7 @@ describe("MCP Integration E2E", () => {
     expect(res.content[0].type).toBe("text");
     const json = JSON.parse(res.content[0].text as string);
     expect(json.status).toBe("success");
-    expect(json.matches[0].file).toBe(testFile);
+    expect(json.matches[0].file).toBe(await fs.realpath(testFile));
   });
 
   it("should execute ParecodeEdit", async () => {
