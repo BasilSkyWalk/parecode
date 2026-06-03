@@ -17,6 +17,11 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.6.2] — 2026-06-03
+
+### Changed
+- Published tarball no longer ships compiled test files. `npm run build` now uses `tsconfig.build.json`, which excludes `src/**/*.test.ts` from emit, so `dist/**/*.test.js` is gone from the package. Type-checking (`tsc --noEmit`) still covers tests via the root `tsconfig.json`. No runtime behavior change.
+
 ## [0.6.1] — 2026-06-03
 
 ### Fixed

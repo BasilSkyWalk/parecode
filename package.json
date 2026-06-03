@@ -1,6 +1,6 @@
 {
   "name": "parecode",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "mcpName": "io.github.BasilSkyWalk/parecode",
   "description": "MCP server for token-aware code search and safe, atomic multi-file edits — built to cut Claude Code token usage on large codebases without giving up correctness.",
   "keywords": [
@@ -26,7 +26,7 @@
   "homepage": "https://github.com/BasilSkyWalk/parecode#readme",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run"
   },
   "bin": {
