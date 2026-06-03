@@ -11,13 +11,30 @@ Tool I/O schema breaks bump the major version and require an entry under
 ## [Unreleased]
 
 ### Added
-- Parecode-owned spill path: when a `ParecodeSearch` result exceeds `SPILL_TOKEN_THRESHOLD` (20,000 estimated tokens), the full result is written to a `parecode-spill-*.json` file under the session data dir, the spill is recorded in `sessionMemory.spills`, and the response returns `status: "spilled"` with `spillPath`, `instructions`, and a top-K `summary` instead of the bulky `matches` array. Preempts the host's own response truncation so the spill path is known to Parecode. See [ADR 0007](docs/adr/0007-parecode-owned-spill.md).
-
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
 ### Security
+
+## [0.6.0] — 2026-06-03
+
+Session Memory & Pattern Quality. All changes are additive to the v0.5 I/O schema; new response fields are omitted when not applicable, so existing consumers are unaffected.
+
+### Added
+- Session memory: a transient per-session record (`sessions/<id>.json` under the data dir) of returned windows, spills, and pattern warnings. Deleted on session end / `parecode prune`; never crosses sessions; no network.
+- Cross-call window dedup: a window already returned earlier in the same session comes back as a `kind: "reference"` placeholder (file + line ranges + a note) instead of repeating its content. Re-fetch with `ParecodeExpand` when needed.
+- `kind` discriminator now always present on `matches[]` items (`"match"` | `"reference"`) for forward compatibility.
+- Pattern pre-flight warnings on `ParecodeSearch` (advisory only, never blocks): `pattern_directory_collision`, `pattern_too_short`, and `prior_overflow_recurrence`, surfaced via the new `warnings` field and `ToolHost.log`.
+- Top-K `summary` field on `ParecodeSearch` results when `matches.length > 10`, listing the heaviest matches by estimated tokens.
+- Parecode-owned spill path: when a `ParecodeSearch` result exceeds `SPILL_TOKEN_THRESHOLD` (20,000 estimated tokens), the full result is written to a `parecode-spill-*.json` file under the session data dir, the spill is recorded in `sessionMemory.spills`, and the response returns `status: "spilled"` with `spillPath`, `instructions`, and a top-K `summary` instead of the bulky `matches` array. Preempts the host's own response truncation so the spill path is known to Parecode. See [ADR 0007](docs/adr/0007-parecode-owned-spill.md).
+- Spill lifecycle: a prior spill is marked consumed when a later `ParecodeExpand` or `ParecodeSearch` targets its path; an unconsumed spill older than 30s surfaces a `spillReminder` on the next response.
+- Stats counters `windowsDedupedAcrossCalls` and `spillsUnconsumed`, surfaced in `parecode stats` and `parecode stats --retroactive` (latter marked `(est)`).
+- `parecode doctor` reports session-memory location and counts; `parecode doctor --reset` clears session-memory files; `parecode prune` GCs stale `sessions/<id>.json` files with no live process.
+- Two sentences to the `ParecodeSearch` tool description covering reference behavior and the `warnings` nudge.
+
+### Changed
+- `stats/estimator.ts` subtracts reference-block content from "tokens saved" so cross-call dedup is not double-credited.
 
 ## [0.5.2] — 2026-05-31
 
