@@ -17,6 +17,11 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.6.1] — 2026-06-03
+
+### Fixed
+- Plugin bundle version is back in lockstep with the package version. `0.6.0` shipped with `plugins/claude-code/.claude-plugin/plugin.json` still at `0.5.2`, which left the bundled plugin's upgrade-detection version stale; both are now `0.6.1`.
+
 ## [0.6.0] — 2026-06-03
 
 Session Memory & Pattern Quality. All changes are additive to the v0.5 I/O schema; new response fields are omitted when not applicable, so existing consumers are unaffected.
