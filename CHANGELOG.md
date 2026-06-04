@@ -17,6 +17,11 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.6.3] — 2026-06-04
+
+### Changed
+- `ParecodeEdit` tool description rewritten to steer the model toward line-range ops (`replaceLines`/`insertAfter` guarded by an `expect` anchor) when target line numbers are known — e.g. the line numbers `ParecodeSearch` returns — and to reserve `oldString` for edits with no known lines. A line number plus a short anchor skips constructing exact-match snippets, so recurring text no longer triggers multiple-match errors and the retries `oldString` needs extra context to avoid. Description-only change; no tool I/O schema change.
+
 ## [0.6.2] — 2026-06-03
 
 ### Changed

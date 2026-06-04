@@ -4,15 +4,16 @@ export const ParecodeEditToolSpec: ToolSpec = {
   name: "ParecodeEdit",
   description:
     "Apply many edits across many files in one call — the edit counterpart to ParecodeSearch/ParecodeExpand. " +
-    "Prefer over native Edit/MultiEdit when: (a) making 2+ edits to one file, or edits across files " +
-    "(files apply in parallel); (b) an oldString from an earlier read may have drifted — set fuzzy:true " +
-    "(whitespace-tolerant) or fuzzy:'aggressive' (also normalizes Unicode look-alikes); (c) the changes are " +
-    "one logical revision that should land together. Each item is either a line-range op (replaceLines or " +
-    "insertAfter, each guarded by an `expect` anchor — the primary path) or a string-patch op " +
-    "(oldString/newString — the fallback). Atomicity is per file, NOT cross-file: within a file all ops apply " +
-    "or none do, but other files commit independently, so check each result's status. Writes are atomic " +
-    "(temp+rename) with mtime conflict detection (a concurrent external edit returns `conflict` with no write); " +
-    "fuzzy matching fails closed below 0.85 confidence.",
+    "Prefer over native Edit/MultiEdit for 2+ edits to one file, edits across files (files apply in parallel), " +
+    "or one logical revision that should land together. Each item is a line-range op (replaceLines or " +
+    "insertAfter, guarded by an `expect` anchor) or a string-patch op (oldString/newString; fuzzy:true tolerates " +
+    "whitespace drift, 'aggressive' also normalizes Unicode look-alikes). Strongly prefer line-range ops when " +
+    "you know the target lines — e.g. the line numbers ParecodeSearch returned: a line number plus a " +
+    "short `expect` anchor skips constructing exact-match snippets, so recurring text (a repeated call) can't " +
+    "trigger the multiple-match errors and retries an oldString needs extra context to avoid. Reserve oldString " +
+    "for edits with no known lines. Atomicity is per file, NOT cross-file: within a file all ops apply or none, " +
+    "other files commit independently — check each result's status. Writes are atomic with mtime conflict " +
+    "detection; fuzzy fails closed below 0.85 confidence.",
   inputSchema: {
     type: "object",
     properties: {
