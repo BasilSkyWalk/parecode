@@ -19,6 +19,7 @@ export type EditResult = {
     detail?: string;
     confidence?: number;
     matchedText?: string;
+    usedFuzzy?: boolean;
   }>;
 };
 
@@ -48,6 +49,7 @@ export class EditEngine {
           detail?: string;
           confidence?: number;
           matchedText?: string;
+          usedFuzzy?: boolean;
           resolvedRange?: [number, number];
           newLines?: string[];
         }> = [];
@@ -104,7 +106,8 @@ export class EditEngine {
             status: r.status,
             detail: r.detail,
             confidence: r.confidence,
-            matchedText: r.matchedText
+            matchedText: r.matchedText,
+            usedFuzzy: r.usedFuzzy
           }))
         };
       } catch (error) {
@@ -133,6 +136,23 @@ export class EditEngine {
         }
       }
     }
+    let fuzzyResolved = 0;
+    let fuzzyFailed = 0;
+    let snippetMismatches = 0;
+    let minFuzzyConfidence: number | undefined;
+    for (const result of results) {
+      for (const op of result.opResults ?? []) {
+        if (op.status === "fuzzy_match_failed") fuzzyFailed++;
+        if (op.status === "snippet_mismatch") snippetMismatches++;
+        if (op.status === "success" && op.usedFuzzy) {
+          fuzzyResolved++;
+          if (op.confidence !== undefined) {
+            minFuzzyConfidence = Math.min(minFuzzyConfidence ?? 1, op.confidence);
+          }
+        }
+      }
+    }
+
     this.host.recordStat({
       toolCall: "ParecodeEdit",
       filesEdited: editsByFile.size,
@@ -140,6 +160,10 @@ export class EditEngine {
       estimatedNativeTokens,
       actualTokens,
       callsBatched: request.edits.length > 0 ? request.edits.length - 1 : 0,
+      fuzzyResolved,
+      fuzzyFailed,
+      snippetMismatches,
+      ...(minFuzzyConfidence !== undefined ? { minFuzzyConfidence } : {}),
     });
 
     return { results };
@@ -163,15 +187,26 @@ export class EditEngine {
     const windowStart = Math.max(0, start - 20);
     const windowEnd = Math.min(lines.length, end + 20);
     const windowContent = lines.slice(windowStart, windowEnd).join("\n");
-    const match = findFuzzyMatch(windowContent, expect.replace("\n…\n", "\n"), false);
-    if (match && match.confidence >= 0.85) {
+    const match = findFuzzyMatch(windowContent, expectFirst, false);
+    if (match?.kind === "ambiguous") {
+      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near lines ${start}-${end}` };
+    }
+    if (match?.kind === "match") {
       const matchStartOffset = windowContent.substring(0, match.startIndex).split("\n").length - 1;
-      const matchEndOffset = windowContent.substring(0, match.endIndex).split("\n").length - 1;
+      const relocatedStart = windowStart + matchStartOffset + 1;
+      const relocatedEnd = relocatedStart + (end - start);
+      if (relocatedEnd > lines.length) {
+        return { status: "snippet_mismatch" as const, detail: `Relocated range ${relocatedStart}-${relocatedEnd} extends past end of file` };
+      }
+      if (expectLast !== undefined && lines[relocatedEnd - 1].trim() !== expectLast.trim()) {
+        return { status: "snippet_mismatch" as const, detail: `Last-line anchor does not match at relocated lines ${relocatedStart}-${relocatedEnd}` };
+      }
       return {
         status: "success" as const,
         confidence: match.confidence,
         matchedText: match.matchedText,
-        resolvedRange: [windowStart + matchStartOffset + 1, windowStart + matchEndOffset + 1] as [number, number],
+        usedFuzzy: true,
+        resolvedRange: [relocatedStart, relocatedEnd] as [number, number],
         newLines: content.split(/\r?\n/)
       };
     }
@@ -201,13 +236,17 @@ export class EditEngine {
     const windowEnd = Math.min(lines.length, insertAfter + 20);
     const windowContent = lines.slice(windowStart, windowEnd).join("\n");
     const match = findFuzzyMatch(windowContent, expect, false);
-    if (match && match.confidence >= 0.85) {
-      const matchEndOffset = windowContent.substring(0, match.endIndex).split("\n").length - 1;
-      const resolvedInsertAfter = windowStart + matchEndOffset + 1;
+    if (match?.kind === "ambiguous") {
+      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near line ${insertAfter}` };
+    }
+    if (match?.kind === "match") {
+      const matchStartOffset = windowContent.substring(0, match.startIndex).split("\n").length - 1;
+      const resolvedInsertAfter = windowStart + matchStartOffset + 1;
       return {
         status: "success" as const,
         confidence: match.confidence,
         matchedText: match.matchedText,
+        usedFuzzy: true,
         resolvedRange: [resolvedInsertAfter + 1, resolvedInsertAfter] as [number, number],
         newLines: content.split(/\r?\n/)
       };
@@ -219,6 +258,7 @@ export class EditEngine {
   private verifyAndResolveStringOp(content: string, oldString: string, newString: string, fuzzy?: boolean | string) {
     const count = content.split(oldString).length - 1;
     let match: { startIndex: number; endIndex: number; matchedText: string; confidence: number } | null = null;
+    let usedFuzzy = false;
 
     if (count === 1) {
       const startIndex = content.indexOf(oldString);
@@ -226,7 +266,11 @@ export class EditEngine {
     } else if (count > 1) {
       return { status: "error" as const, detail: "Multiple occurrences of exact match found" };
     } else if (fuzzy) {
+      usedFuzzy = true;
       const fuzzyMatch = findFuzzyMatch(content, oldString, fuzzy === "aggressive");
+      if (fuzzyMatch?.kind === "ambiguous") {
+        return { status: "error" as const, detail: `Multiple fuzzy matches found (${fuzzyMatch.occurrences} locations)` };
+      }
       if (fuzzyMatch) {
         match = fuzzyMatch;
       } else {
@@ -242,14 +286,33 @@ export class EditEngine {
     const endLine = content.substring(0, match.endIndex).split("\n").length;
 
     const lineStartOffset = prefix.lastIndexOf("\n") + 1;
+    const linePrefix = prefix.substring(lineStartOffset);
     const nextNewline = suffix.indexOf("\n");
     const lineEndOffset = nextNewline === -1 ? suffix.length : nextNewline;
-    const fullNewText = prefix.substring(lineStartOffset) + newString + suffix.substring(0, lineEndOffset);
+
+    let replacement = newString;
+    let keptLinePrefix = linePrefix;
+    if (usedFuzzy) {
+      const oldIndent = oldString.match(/^[ \t]*/)![0];
+      if (oldIndent.length > 0 && linePrefix.trim() === "") {
+        replacement = newString
+          .split("\n")
+          .map(line => line.startsWith(oldIndent) ? linePrefix + line.slice(oldIndent.length) : line)
+          .join("\n");
+        keptLinePrefix = "";
+      }
+      if (/\s$/.test(oldString)) {
+        replacement = replacement.replace(/\s+$/, "");
+      }
+    }
+
+    const fullNewText = keptLinePrefix + replacement + suffix.substring(0, lineEndOffset);
 
     return {
       status: "success" as const,
       confidence: match.confidence,
       matchedText: match.matchedText,
+      usedFuzzy: usedFuzzy || undefined,
       resolvedRange: [startLine, endLine] as [number, number],
       newLines: fullNewText.split(/\r?\n/)
     };

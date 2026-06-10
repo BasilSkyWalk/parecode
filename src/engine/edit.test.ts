@@ -759,6 +759,221 @@ describe("EditEngine", () => {
     });
   });
 
+  describe("fuzzy safety", () => {
+    const makeHost = (content: string): ToolHost => ({
+      registerTool: vi.fn(),
+      dispatchSubagent: vi.fn(),
+      sessionId: vi.fn().mockReturnValue("test-session"),
+      sessionDataPath: vi.fn().mockReturnValue("/tmp"),
+      readFile: vi.fn().mockResolvedValue(content),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      log: vi.fn(),
+      recordStat: vi.fn(),
+      exec: vi.fn(),
+      resolveCommand: vi.fn(),
+      realpath: vi.fn().mockImplementation(async (p: string) => p),
+      listDirs: vi.fn().mockResolvedValue([]),
+      statFile: vi.fn().mockResolvedValue({ mtimeMs: 123, size: 456 }),
+    });
+
+    it("should error without writing when fuzzy finds multiple normalized occurrences", async () => {
+      const host = makeHost("function first() {\n  if (flag)  doThing();\n}\nfunction second() {\n  if (flag)  doThing();\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "if (flag) doThing();", newString: "if (flag) doOther();", fuzzy: true }]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("error");
+      expect(result.results[0].opResults?.[0].detail).toContain("Multiple");
+    });
+
+    it("should record fuzzy usage in stats", async () => {
+      const host = makeHost("function f() {\n\treturn x;\n}\n");
+      const engine = new EditEngine(host);
+      await engine.edit({
+        edits: [{ file: "test.ts", oldString: "  return x;", newString: "  return y;", fuzzy: true }]
+      });
+
+      expect(host.recordStat).toHaveBeenCalledWith(expect.objectContaining({
+        toolCall: "ParecodeEdit",
+        fuzzyResolved: 1,
+        fuzzyFailed: 0,
+        snippetMismatches: 0,
+        minFuzzyConfidence: 1
+      }));
+    });
+
+    it("should record fuzzy failures in stats", async () => {
+      const host = makeHost("const myVar = 1;\n");
+      const engine = new EditEngine(host);
+      await engine.edit({
+        edits: [{ file: "test.ts", oldString: "const yourVar = 1;", newString: "const yourVar = 2;", fuzzy: true }]
+      });
+
+      expect(host.recordStat).toHaveBeenCalledWith(expect.objectContaining({
+        fuzzyResolved: 0,
+        fuzzyFailed: 1
+      }));
+    });
+
+    it("should keep the file's indentation when oldString remembers a deeper indent", async () => {
+      const host = makeHost("function f() {\n    return x;\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "        return x;", newString: "        return y;", fuzzy: true }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", "function f() {\n    return y;\n}\n");
+    });
+
+    it("should keep tab indentation when oldString uses spaces", async () => {
+      const host = makeHost("function f() {\n\treturn x;\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "  return x;", newString: "  return y;", fuzzy: true }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", "function f() {\n\treturn y;\n}\n");
+    });
+
+    it("should not insert a blank line when oldString and newString end with a newline", async () => {
+      const host = makeHost("function f() {\n  return x;\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "\treturn x;\n", newString: "\treturn y;\n", fuzzy: true }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", "function f() {\n  return y;\n}\n");
+    });
+
+    it("should reindent every line of a multi-line newString to the file's indentation", async () => {
+      const host = makeHost("if (a) {\n    doA();\n    doB();\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{
+          file: "test.ts",
+          oldString: "  doA();\n  doB();",
+          newString: "  doA();\n  doB();\n  doC();",
+          fuzzy: true
+        }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", "if (a) {\n    doA();\n    doB();\n    doC();\n}\n");
+    });
+
+    const driftedFile = [
+      "import { x } from 'x';",
+      "",
+      "export function keep() {",
+      "  return 1;",
+      "}",
+      "export function target() {",
+      "  const a = 1;",
+      "  const b = 2;",
+      "  return a + b;",
+      "}",
+      "export function tail() {",
+      "  return 9;",
+      "}",
+      "",
+    ].join("\n");
+
+    const driftedFileAfterEdit = [
+      "import { x } from 'x';",
+      "",
+      "export function keep() {",
+      "  return 1;",
+      "}",
+      "export function target() {",
+      "  return 3;",
+      "}",
+      "export function tail() {",
+      "  return 9;",
+      "}",
+      "",
+    ].join("\n");
+
+    it("should preserve range length when relocating a drifted replaceLines with a single-line anchor", async () => {
+      const host = makeHost(driftedFile);
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{
+          file: "test.ts",
+          replaceLines: [4, 8],
+          expect: "export function target() {",
+          content: "export function target() {\n  return 3;\n}"
+        }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", driftedFileAfterEdit);
+    });
+
+    it("should verify the last-line anchor at the relocated range", async () => {
+      const host = makeHost(driftedFile);
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{
+          file: "test.ts",
+          replaceLines: [4, 8],
+          expect: "export function target() {\n…\n}",
+          content: "export function target() {\n  return 3;\n}"
+        }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(host.writeFile).toHaveBeenCalledWith("test.ts", driftedFileAfterEdit);
+    });
+
+    it("should return snippet_mismatch when the last-line anchor fails at the relocated range", async () => {
+      const host = makeHost(driftedFile);
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{
+          file: "test.ts",
+          replaceLines: [4, 8],
+          expect: "export function target() {\n…\n});",
+          content: "export function target() {\n  return 3;\n}"
+        }]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
+    });
+
+    it("should return snippet_mismatch when the relocated range extends past end of file", async () => {
+      const host = makeHost("A\nB\nC\nD\nE\nanchor\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{
+          file: "test.ts",
+          replaceLines: [2, 6],
+          expect: "anchor",
+          content: "NEW"
+        }]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
+    });
+
+    it("should return snippet_mismatch when a drifted anchor is ambiguous in the window", async () => {
+      const host = makeHost("function a() {\n  return 1;\n}\nfunction b() {\n  return 2;\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", insertAfter: 2, content: "INS", expect: "}" }]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
+    });
+  });
+
   describe("fuzzy snapshot tests", () => {
     it("should successfully apply edit with whitespace variants and produce consistent output", async () => {
       const mockHost: ToolHost = {

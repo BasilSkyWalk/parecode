@@ -13,7 +13,7 @@ export const ParecodeEditToolSpec: ToolSpec = {
     "trigger the multiple-match errors and retries an oldString needs extra context to avoid. Reserve oldString " +
     "for edits with no known lines. Atomicity is per file, NOT cross-file: within a file all ops apply or none, " +
     "other files commit independently — check each result's status. Writes are atomic with mtime conflict " +
-    "detection; fuzzy fails closed below 0.85 confidence.",
+    "detection; fuzzy fails closed on low confidence or ambiguity.",
   inputSchema: {
     type: "object",
     properties: {
@@ -44,7 +44,7 @@ export const ParecodeEditToolSpec: ToolSpec = {
             },
             expect: {
               type: "string",
-              description: "Anchor verifying the target before any write: the trimmed first line, or first and last line joined by `\\n…\\n` for ranges. If the lines drifted it is re-located by fuzzy match within ±20 lines at ≥0.85 confidence; if not found, the op returns snippet_mismatch and nothing in that file is written."
+              description: "Anchor verifying the target before any write: the trimmed first line, or first and last line joined by `\\n…\\n` for ranges. If the lines drifted, the first-line anchor is re-located within ±20 lines, the range keeps its original length, and the last-line anchor is re-verified at the new position; if the anchor is missing or matches more than one nearby location, the op returns snippet_mismatch and nothing in that file is written."
             },
             oldString: {
               type: "string",
@@ -59,7 +59,7 @@ export const ParecodeEditToolSpec: ToolSpec = {
                 { type: "boolean" },
                 { type: "string", enum: ["aggressive"] }
               ],
-              description: "String-patch tolerance: true = whitespace-insensitive matching; 'aggressive' = also normalize Unicode look-alikes (NFKD). Below 0.85 confidence it fails closed (fuzzy_match_failed) rather than guessing. Omit for exact-only matching."
+              description: "String-patch tolerance: true = whitespace-insensitive matching; 'aggressive' = also normalize Unicode look-alikes (NFKD). Beyond whitespace it tolerates only ~5% character drift — short strings must match exactly after whitespace normalization — and it fails closed (fuzzy_match_failed) rather than guessing; if several locations match, the op errors out instead of picking one. Replacements adopt the file's existing indentation when it differs from oldString. Omit for exact-only matching."
             }
           },
           required: ["file"],

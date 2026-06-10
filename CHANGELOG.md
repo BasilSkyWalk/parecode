@@ -17,6 +17,22 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.7.0] — 2026-06-10
+
+Fuzzy edit safety. Every change closes a path where `ParecodeEdit` could corrupt a file while reporting success; expect a small uptick in fail-closed retries (`fuzzy_match_failed` / `snippet_mismatch`) in exchange. No tool I/O schema break — new response fields are additive.
+
+### Added
+- `ParecodeEdit` per-op results and session stats now report fuzzy usage: `usedFuzzy` on each op result, plus `fuzzyResolved`, `fuzzyFailed`, `snippetMismatches`, and `minFuzzyConfidence` in the recorded stat event. Additive only; fields are omitted or `undefined` when fuzzy was not involved.
+
+### Changed
+- Fuzzy matching no longer accepts a flat 0.85 confidence ratio. Beyond whitespace normalization it tolerates at most ~5% character drift, so short `oldString`s must match exactly after whitespace is ignored. Previously `const b = 1;` would happily rewrite `const a = 1;`; now that fails closed with `fuzzy_match_failed`.
+- Fuzzy matching now detects ambiguity. When the whitespace-normalized `oldString` (or a drifted line anchor) matches more than one location, the op errors out (`Multiple fuzzy matches found`) or returns `snippet_mismatch` instead of silently editing the first occurrence.
+
+### Fixed
+- Drifted `replaceLines` ranges no longer collapse to the anchor span. The relocated range keeps its original length and the last-line anchor is re-verified at the new position, so a stale line number can no longer leave orphaned lines of the old range behind while reporting success at confidence 1.0.
+- Fuzzy string patches no longer mangle indentation. When `oldString`'s remembered indentation differs from the file (deeper indent, tabs vs spaces), the replacement adopts the file's actual indentation instead of stacking both; a trailing-newline `oldString` no longer injects a blank line.
+- `insertAfter` anchor relocation now resolves to the line where the anchor starts rather than where the match ends.
+
 ## [0.6.3] — 2026-06-04
 
 ### Changed

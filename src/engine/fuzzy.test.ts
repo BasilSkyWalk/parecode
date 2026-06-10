@@ -15,19 +15,31 @@ describe("Fuzzy Match", () => {
     const search = "const a = 1;";
     
     const result = findFuzzyMatch(content, search);
-    expect(result).not.toBeNull();
-    expect(result?.confidence).toBe(1.0);
-    expect(result?.matchedText).toBe("const   a  = \n 1;");
+    expect(result).toMatchObject({ kind: "match", confidence: 1.0, matchedText: "const   a  = \n 1;" });
   });
 
-  it("should match with high confidence on minor typos", () => {
+  it("should fail closed when a short search differs by one character", () => {
     const content = "const a = 1;";
     const search = "const b = 1;";
-    
+
     const result = findFuzzyMatch(content, search);
-    expect(result).not.toBeNull();
-    expect(result?.confidence).toBeGreaterThanOrEqual(0.85);
-    expect(result?.matchedText).toBe("const a = 1;");
+    expect(result).toBeNull();
+  });
+
+  it("should tolerate proportional drift in long searches", () => {
+    const content = "const veryLongVariableNameForTesting = computeSomething(alpha, betq);";
+    const search = "const veryLongVariableNameForTesting = computeSomething(alpha, beta);";
+
+    const result = findFuzzyMatch(content, search);
+    expect(result).toMatchObject({ kind: "match", matchedText: content });
+  });
+
+  it("should report ambiguity when the search matches multiple locations", () => {
+    const content = "if (flag)  doThing();\nother();\nif (flag)   doThing();";
+    const search = "if (flag) doThing();";
+
+    const result = findFuzzyMatch(content, search);
+    expect(result).toMatchObject({ kind: "ambiguous", occurrences: 2 });
   });
 
   it("should fail closed on low confidence", () => {
@@ -46,9 +58,7 @@ describe("Fuzzy Match", () => {
     expect(resultNormal).toBeNull();
     
     const resultAggressive = findFuzzyMatch(content, search, true);
-    expect(resultAggressive).not.toBeNull();
-    expect(resultAggressive?.confidence).toBe(1.0);
-    expect(resultAggressive?.matchedText).toBe("const re\u0301sume\u0301 = 1;");
+    expect(resultAggressive).toMatchObject({ kind: "match", confidence: 1.0, matchedText: "const résumé = 1;" });
   });
 
   it("should fail gracefully on empty search", () => {

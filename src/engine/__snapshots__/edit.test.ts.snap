@@ -12,12 +12,14 @@ exports[`EditEngine > fuzzy snapshot tests > should successfully apply edit with
           "detail": undefined,
           "matchedText": "const a = "café";",
           "status": "success",
+          "usedFuzzy": true,
         },
         {
           "confidence": 1,
           "detail": undefined,
           "matchedText": "const b = "résumé";",
           "status": "success",
+          "usedFuzzy": true,
         },
       ],
       "status": "success",
@@ -60,6 +62,7 @@ return   "world"  ;
 
 }",
           "status": "success",
+          "usedFuzzy": true,
         },
       ],
       "status": "success",
