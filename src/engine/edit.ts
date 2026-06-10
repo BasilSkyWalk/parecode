@@ -105,8 +105,8 @@ export class EditEngine {
           opResults: opResults.map(r => ({
             status: r.status,
             detail: r.detail,
-            confidence: r.confidence,
-            matchedText: r.matchedText,
+            confidence: r.usedFuzzy ? r.confidence : undefined,
+            matchedText: r.usedFuzzy ? r.matchedText : undefined,
             usedFuzzy: r.usedFuzzy
           }))
         };

@@ -17,6 +17,17 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.7.1] — 2026-06-10
+
+Response-token diet. Typical exact-match edit responses shrink ~90%, search responses ~35%; no tool I/O schema break (the trimmed fields were always optional).
+
+### Changed
+- Tool responses are serialized as compact JSON (no indentation), cutting response tokens roughly a third on typical search payloads.
+- `ParecodeEdit` op results no longer echo `matchedText` and `confidence` on exact-match successes — they repeated the `oldString` the model just sent, and every echoed byte re-enters context on each later turn. Both fields still appear on fuzzy-resolved ops (alongside `usedFuzzy`), where they are diagnostic.
+
+### Fixed
+- When a file's content is dropped for exceeding the per-file inline cap, its `lineRanges` is now emptied instead of duplicating `omittedLineRanges`. This also stops session memory from recording dropped windows as returned, which previously made identical follow-up searches come back as `reference` placeholders for content the model had never seen.
+
 ## [0.7.0] — 2026-06-10
 
 Fuzzy edit safety. Every change closes a path where `ParecodeEdit` could corrupt a file while reporting success; expect a small uptick in fail-closed retries (`fuzzy_match_failed` / `snippet_mismatch`) in exchange. No tool I/O schema break — new response fields are additive.

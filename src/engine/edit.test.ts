@@ -788,6 +788,30 @@ describe("EditEngine", () => {
       expect(result.results[0].opResults?.[0].detail).toContain("Multiple");
     });
 
+    it("should not echo matchedText or confidence on exact-match successes", async () => {
+      const host = makeHost("const a = 1;\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "const a = 1;", newString: "const a = 2;" }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(result.results[0].opResults?.[0].matchedText).toBeUndefined();
+      expect(result.results[0].opResults?.[0].confidence).toBeUndefined();
+    });
+
+    it("should keep matchedText and confidence on fuzzy-resolved successes", async () => {
+      const host = makeHost("function f() {\n\treturn x;\n}\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", oldString: "  return x;", newString: "  return y;", fuzzy: true }]
+      });
+
+      expect(result.results[0].status).toBe("success");
+      expect(result.results[0].opResults?.[0].matchedText).toBeDefined();
+      expect(result.results[0].opResults?.[0].confidence).toBe(1.0);
+    });
+
     it("should record fuzzy usage in stats", async () => {
       const host = makeHost("function f() {\n\treturn x;\n}\n");
       const engine = new EditEngine(host);

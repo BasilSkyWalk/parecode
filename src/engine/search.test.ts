@@ -567,6 +567,24 @@ describe("SearchEngine", () => {
       }
     });
 
+    it("clears lineRanges when content is omitted so dropped windows are not recorded as returned", async () => {
+      const heavyLine = "x".repeat(2100) + "\n";
+      const stdout = toRgJson([
+        { type: "match", file: "a.ts", line: 1, text: heavyLine },
+      ]);
+      const host = makeHost({
+        exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      });
+      const engine = new SearchEngine(host);
+
+      const result = await engine.search({ pattern: "x" });
+
+      const m = (result.matches as SearchMatch[])![0];
+      expect(m.content).toBeUndefined();
+      expect(m.lineRanges).toEqual([]);
+      expect(m.omittedLineRanges).toContainEqual([1, 1]);
+    });
+
     it("inlines small matches even when a sibling match is omitted", async () => {
       const heavyLine = "x".repeat(2100) + "\n";
       const stdout = toRgJson([

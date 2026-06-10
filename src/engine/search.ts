@@ -230,6 +230,7 @@ export class SearchEngine {
       const matchBytes = match.content ? Buffer.byteLength(match.content, "utf8") : 0;
       if (matchBytes > INLINE_THRESHOLD) {
         match.omittedLineRanges = mergeRanges(match.omittedLineRanges, match.lineRanges);
+        match.lineRanges = [];
         delete match.content;
       }
     }

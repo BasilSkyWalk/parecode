@@ -51,6 +51,20 @@ describe("MCP Integration E2E", () => {
     expect(toolNames).toEqual(["ParecodeEdit", "ParecodeExpand", "ParecodeSearch"]);
   });
 
+  it("should return compact JSON without indentation", async () => {
+    const testFile = path.join(tmpDirPath, "compact_test.txt");
+    await fs.writeFile(testFile, "alpha beta\n", "utf-8");
+
+    const result = await client.callTool({
+      name: "ParecodeSearch",
+      arguments: { pattern: "alpha", paths: [tmpDirPath] }
+    });
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text.startsWith("{\"")).toBe(true);
+    expect(text).not.toContain("\n");
+  });
+
   it("should execute ParecodeSearch", async () => {
     const testFile = path.join(tmpDirPath, "search_test.txt");
     await fs.writeFile(testFile, "hello world\nhello parecode", "utf-8");

@@ -49,7 +49,7 @@ export class McpAdapter implements ToolHost {
         const startedAt = Date.now();
         try {
           const result = await tool.handler(request.params.arguments, extra);
-          const text = JSON.stringify(result, null, 2);
+          const text = JSON.stringify(result);
           this.envelope.record({
             toolCall: tool.spec.name,
             bytesReturned: Buffer.byteLength(text, "utf-8"),
