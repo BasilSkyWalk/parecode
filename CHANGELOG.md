@@ -17,6 +17,14 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.8.0] — 2026-06-10
+
+Self-maintenance: logs stop growing forever and updates become one command. Still zero network at runtime — the only network activity is the npm subprocess inside the explicit, user-invoked `parecode update`.
+
+### Added
+- Automatic log cleanup on every `parecode serve` start: session files older than 30 days are pruned (same logic as `parecode prune 30`, including `index.json` rollup entries and spill files) and `envelope.jsonl` is truncated to its newest ~2.5 MB once it exceeds 5 MB. Fire-and-forget — cleanup failures are logged and never block the server.
+- `parecode update`: updates an npm global install to the latest release via `npm install -g parecode@latest`, then re-runs `parecode init` from the freshly installed version so the plugin bundle and hooks can no longer go stale. Refuses with manual instructions when parecode is not an npm global install (npx cache, local dependency).
+
 ## [0.7.1] — 2026-06-10
 
 Response-token diet. Typical exact-match edit responses shrink ~90%, search responses ~35%; no tool I/O schema break (the trimmed fields were always optional).

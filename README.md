@@ -104,7 +104,7 @@ Tokens saved (est):  1,200,000
 
 ## Privacy
 
-Parecode performs **no network calls at runtime**. Session logs are written to your OS data directory (resolved via [`env-paths`](https://github.com/sindresorhus/env-paths)) with `0600` permissions on Unix. Prune with `parecode prune <days>` or wipe the data dir.
+Parecode performs **no network calls at runtime**. Session logs are written to your OS data directory (resolved via [`env-paths`](https://github.com/sindresorhus/env-paths)) with `0600` permissions on Unix. Logs are self-maintaining: each server start prunes session data older than 30 days and caps the envelope log at 5 MB. Prune earlier with `parecode prune <days>` or wipe the data dir. Update to the latest release (and refresh hooks/plugin) with `parecode update`.
 
 ---
 

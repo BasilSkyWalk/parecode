@@ -14,10 +14,15 @@ import { flushCommand } from "./flush.js";
 import { hookCommand } from "./hook.js";
 import { tokensCommand } from "./tokens.js";
 import { envelopeCommand } from "./envelope.js";
+import { runStartupCleanup } from "../stats/retention.js";
+import { updateCommand } from "./update.js";
+import envPaths from "env-paths";
 
 async function serve() {
   const adapter = new McpAdapter();
   await adapter.initTracker();
+
+  void runStartupCleanup(envPaths("parecode").data, (msg, meta) => adapter.log("info", msg, meta));
 
   const searchEngine = new SearchEngine(adapter);
   adapter.registerTool(
@@ -88,6 +93,9 @@ async function main() {
       break;
     case "envelope":
       await envelopeCommand(args.slice(1));
+      break;
+    case "update":
+      process.exitCode = await updateCommand(args.slice(1));
       break;
     default:
       process.stderr.write(`Unknown command: ${cmd}\n`);
