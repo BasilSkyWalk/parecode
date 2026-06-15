@@ -17,6 +17,11 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.9.1] — 2026-06-15
+
+### Fixed
+- Synced the bundled Claude Code plugin (`plugins/claude-code/.claude-plugin/plugin.json`) to the package version; it was left at 0.8.0 in the 0.9.0 release, which would have suppressed the plugin auto-upgrade prompt for users already on the 0.8.0 bundle.
+
 ## [0.9.0] — 2026-06-15
 
 Token-saving search and self-correcting edits. No tool I/O schema break — the new `mode` input and the `actual`/stat output fields are all additive.
