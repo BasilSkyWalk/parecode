@@ -20,6 +20,7 @@ export type EditResult = {
     confidence?: number;
     matchedText?: string;
     usedFuzzy?: boolean;
+    actual?: string;
   }>;
 };
 
@@ -50,6 +51,7 @@ export class EditEngine {
           confidence?: number;
           matchedText?: string;
           usedFuzzy?: boolean;
+          actual?: string;
           resolvedRange?: [number, number];
           newLines?: string[];
         }> = [];
@@ -107,7 +109,8 @@ export class EditEngine {
             detail: r.detail,
             confidence: r.usedFuzzy ? r.confidence : undefined,
             matchedText: r.usedFuzzy ? r.matchedText : undefined,
-            usedFuzzy: r.usedFuzzy
+            usedFuzzy: r.usedFuzzy,
+            ...(r.actual !== undefined ? { actual: r.actual } : {})
           }))
         };
       } catch (error) {
@@ -139,8 +142,14 @@ export class EditEngine {
     let fuzzyResolved = 0;
     let fuzzyFailed = 0;
     let snippetMismatches = 0;
+    let editsApplied = 0;
+    let filesEdited = 0;
     let minFuzzyConfidence: number | undefined;
     for (const result of results) {
+      if (result.status === "success") {
+        filesEdited++;
+        editsApplied += editsByFile.get(result.file)?.length ?? 0;
+      }
       for (const op of result.opResults ?? []) {
         if (op.status === "fuzzy_match_failed") fuzzyFailed++;
         if (op.status === "snippet_mismatch") snippetMismatches++;
@@ -155,8 +164,8 @@ export class EditEngine {
 
     this.host.recordStat({
       toolCall: "ParecodeEdit",
-      filesEdited: editsByFile.size,
-      editsApplied: request.edits.length,
+      filesEdited,
+      editsApplied,
       estimatedNativeTokens,
       actualTokens,
       callsBatched: request.edits.length > 0 ? request.edits.length - 1 : 0,
@@ -172,6 +181,7 @@ export class EditEngine {
   private verifyAndResolveLineOp(lines: string[], start: number, end: number, expect: string, content: string) {
     const targetLines = lines.slice(start - 1, end);
     const [expectFirst, expectLast] = expect.split("\n…\n");
+    const actual = snapshotActual(lines, start, end);
 
     const firstMatch = targetLines[0]?.trim() === expectFirst.trim();
     const lastMatch = expectLast ? targetLines[targetLines.length - 1]?.trim() === expectLast.trim() : true;
@@ -184,22 +194,26 @@ export class EditEngine {
       };
     }
 
+    if (expectLast === undefined && end > start) {
+      return { status: "snippet_mismatch" as const, detail: `Lines ${start}-${end} drifted; relocating a multi-line range needs a two-ended anchor (first line + \\n…\\n + last line)`, actual };
+    }
+
     const windowStart = Math.max(0, start - 20);
     const windowEnd = Math.min(lines.length, end + 20);
     const windowContent = lines.slice(windowStart, windowEnd).join("\n");
     const match = findFuzzyMatch(windowContent, expectFirst, false);
     if (match?.kind === "ambiguous") {
-      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near lines ${start}-${end}` };
+      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near lines ${start}-${end}`, actual };
     }
     if (match?.kind === "match") {
       const matchStartOffset = windowContent.substring(0, match.startIndex).split("\n").length - 1;
       const relocatedStart = windowStart + matchStartOffset + 1;
       const relocatedEnd = relocatedStart + (end - start);
       if (relocatedEnd > lines.length) {
-        return { status: "snippet_mismatch" as const, detail: `Relocated range ${relocatedStart}-${relocatedEnd} extends past end of file` };
+        return { status: "snippet_mismatch" as const, detail: `Relocated range ${relocatedStart}-${relocatedEnd} extends past end of file`, actual };
       }
       if (expectLast !== undefined && lines[relocatedEnd - 1].trim() !== expectLast.trim()) {
-        return { status: "snippet_mismatch" as const, detail: `Last-line anchor does not match at relocated lines ${relocatedStart}-${relocatedEnd}` };
+        return { status: "snippet_mismatch" as const, detail: `Last-line anchor does not match at relocated lines ${relocatedStart}-${relocatedEnd}`, actual: snapshotActual(lines, relocatedStart, relocatedEnd) };
       }
       return {
         status: "success" as const,
@@ -211,10 +225,11 @@ export class EditEngine {
       };
     }
 
-    return { status: "snippet_mismatch" as const, detail: `Expected anchor not found at lines ${start}-${end}` };
+    return { status: "snippet_mismatch" as const, detail: `Expected anchor not found at lines ${start}-${end}`, actual };
   }
 
   private verifyAndResolveInsertOp(lines: string[], insertAfter: number, expect: string, content: string) {
+    const actual = snapshotActual(lines, insertAfter, insertAfter);
     if (insertAfter === 0) {
       return {
         status: "success" as const,
@@ -237,7 +252,7 @@ export class EditEngine {
     const windowContent = lines.slice(windowStart, windowEnd).join("\n");
     const match = findFuzzyMatch(windowContent, expect, false);
     if (match?.kind === "ambiguous") {
-      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near line ${insertAfter}` };
+      return { status: "snippet_mismatch" as const, detail: `Anchor matches ${match.occurrences} locations near line ${insertAfter}`, actual };
     }
     if (match?.kind === "match") {
       const matchStartOffset = windowContent.substring(0, match.startIndex).split("\n").length - 1;
@@ -252,7 +267,7 @@ export class EditEngine {
       };
     }
 
-    return { status: "snippet_mismatch" as const, detail: `Expected anchor line not found near line ${insertAfter}` };
+    return { status: "snippet_mismatch" as const, detail: `Expected anchor line not found near line ${insertAfter}`, actual };
   }
 
   private verifyAndResolveStringOp(content: string, oldString: string, newString: string, fuzzy?: boolean | string) {
@@ -317,6 +332,19 @@ export class EditEngine {
       newLines: fullNewText.split(/\r?\n/)
     };
   }
+}
+
+const SNAPSHOT_MARGIN = 2;
+const SNAPSHOT_MAX_LINES = 14;
+
+function snapshotActual(lines: string[], start: number, end: number): string {
+  const from = Math.max(1, start - SNAPSHOT_MARGIN);
+  const to = Math.min(lines.length, end + SNAPSHOT_MARGIN);
+  const numbered: string[] = [];
+  for (let n = from; n <= to; n++) numbered.push(`${n}| ${lines[n - 1]}`);
+  if (numbered.length <= SNAPSHOT_MAX_LINES) return numbered.join("\n");
+  const half = Math.floor(SNAPSHOT_MAX_LINES / 2);
+  return [...numbered.slice(0, half), "…", ...numbered.slice(numbered.length - half)].join("\n");
 }
 
 function hasOverlappingEdits(opResults: Array<{ resolvedRange?: [number, number] }>): boolean {

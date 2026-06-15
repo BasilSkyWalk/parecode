@@ -841,6 +841,23 @@ describe("EditEngine", () => {
       }));
     });
 
+    it("should count only written ops in editsApplied and filesEdited", async () => {
+      const host = makeHost("const myVar = 1;\n");
+      const engine = new EditEngine(host);
+      await engine.edit({
+        edits: [
+          { file: "test.ts", oldString: "const myVar = 1;", newString: "const myVar = 2;" },
+          { file: "test.ts", oldString: "const missing = 9;", newString: "const missing = 0;" }
+        ]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(host.recordStat).toHaveBeenCalledWith(expect.objectContaining({
+        editsApplied: 0,
+        filesEdited: 0
+      }));
+    });
+
     it("should keep the file's indentation when oldString remembers a deeper indent", async () => {
       const host = makeHost("function f() {\n    return x;\n}\n");
       const engine = new EditEngine(host);
@@ -922,7 +939,7 @@ describe("EditEngine", () => {
       "",
     ].join("\n");
 
-    it("should preserve range length when relocating a drifted replaceLines with a single-line anchor", async () => {
+    it("should refuse to relocate a drifted multi-line range guarded by only a single-line anchor", async () => {
       const host = makeHost(driftedFile);
       const engine = new EditEngine(host);
       const result = await engine.edit({
@@ -934,8 +951,8 @@ describe("EditEngine", () => {
         }]
       });
 
-      expect(result.results[0].status).toBe("success");
-      expect(host.writeFile).toHaveBeenCalledWith("test.ts", driftedFileAfterEdit);
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
     });
 
     it("should verify the last-line anchor at the relocated range", async () => {
@@ -968,6 +985,20 @@ describe("EditEngine", () => {
 
       expect(host.writeFile).not.toHaveBeenCalled();
       expect(result.results[0].status).toBe("snippet_mismatch");
+    });
+
+    it("should return a line-numbered actual snapshot on snippet_mismatch so the caller can self-correct", async () => {
+      const host = makeHost("alpha\nbeta\ngamma\ndelta\n");
+      const engine = new EditEngine(host);
+      const result = await engine.edit({
+        edits: [{ file: "test.ts", replaceLines: [2, 2], content: "BETA", expect: "not-the-real-line" }]
+      });
+
+      expect(host.writeFile).not.toHaveBeenCalled();
+      expect(result.results[0].status).toBe("snippet_mismatch");
+      const actual = result.results[0].opResults?.[0].actual;
+      expect(actual).toContain("2| beta");
+      expect(actual).toContain("1| alpha");
     });
 
     it("should return snippet_mismatch when the relocated range extends past end of file", async () => {

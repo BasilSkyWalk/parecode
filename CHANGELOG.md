@@ -17,6 +17,20 @@ Tool I/O schema breaks bump the major version and require an entry under
 ### Fixed
 ### Security
 
+## [0.9.0] — 2026-06-15
+
+Token-saving search and self-correcting edits. No tool I/O schema break — the new `mode` input and the `actual`/stat output fields are all additive.
+
+### Added
+- `ParecodeSearch` `mode: 'locate'`: returns only hit locations (file + line + matched line) with no content windows — the lean option for broad fan-out searches across many files. Follow up with `ParecodeExpand` on the locations that matter. Locate skips per-file window building, cross-call content dedup, and returned-window recording, and tags its stat event `truncate: "v1-locate"`.
+- `ParecodeEdit` returns an `actual` snapshot — line-numbered current contents at the target (±2 lines, capped) — on every `snippet_mismatch`, so the caller can correct the anchor or line numbers in place without re-reading the file.
+
+### Changed
+- `ParecodeEdit` no longer fuzzy-relocates a drifted multi-line `replaceLines` range that is guarded by only a single-line `expect` anchor; it returns `snippet_mismatch` instead of overwriting an unverified range. Relocating a multi-line range now requires the two-ended (`first\n…\nlast`) anchor. Expect a few more fail-closed retries in exchange for closing a silent-corruption path.
+
+### Fixed
+- `ParecodeEdit` stats `editsApplied` and `filesEdited` now count only ops in files that were actually written, instead of the number requested. A fully-rejected batch records `0`/`0` instead of inflating savings dashboards.
+
 ## [0.8.0] — 2026-06-10
 
 Self-maintenance: logs stop growing forever and updates become one command. Still zero network at runtime — the only network activity is the npm subprocess inside the explicit, user-invoked `parecode update`.

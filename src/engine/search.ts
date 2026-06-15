@@ -10,6 +10,7 @@ export interface SearchArgs {
   contextLines?: number;
   maxBytesPerFile?: number;
   relatedSymbols?: boolean;
+  mode?: "locate";
 }
 
 export interface SearchHit {
@@ -180,9 +181,21 @@ export class SearchEngine {
 
     const sourceSymbols = args.relatedSymbols ? extractSourceSymbols(patterns) : [];
 
+    const locateMode = args.mode === "locate";
     const matches: SearchMatch[] = [];
 
     for (const fr of perFile.values()) {
+      if (locateMode) {
+        const realFile = await this.host.realpath(fr.file);
+        matches.push({
+          kind: "match",
+          file: realFile,
+          hits: dedupeAndSortHits(fr.hits),
+          lineRanges: [],
+          patterns: Array.from(new Set(fr.windows.flatMap((w) => Array.from(w.patterns)))).sort(),
+        });
+        continue;
+      }
       fr.windows.sort((a, b) => a.startLine - b.startLine);
       const plan = planMerges(fr.windows, ctx);
       const mergedWindows = await this.executeMerges(fr.file, fr.windows, plan);
@@ -196,15 +209,7 @@ export class SearchEngine {
       const omittedLines = omitted ? omitted.reduce((sum, [s, e]) => sum + (e - s + 1), 0) : 0;
       const includeRanges = omitted && omitted.length > 0 && omitted.length <= OMITTED_RANGES_INLINE_CAP;
 
-      const seenHits = new Set<string>();
-      const hits = fr.hits
-        .filter((h) => {
-          const k = `${h.line}:${h.matchText}`;
-          if (seenHits.has(k)) return false;
-          seenHits.add(k);
-          return true;
-        })
-        .sort((a, b) => a.line - b.line);
+      const hits = dedupeAndSortHits(fr.hits);
 
       const realFile = await this.host.realpath(fr.file);
 
@@ -245,7 +250,7 @@ export class SearchEngine {
       }),
     );
 
-    const matchesDeduped = updatedMemory ? dedupWindows(matches, updatedMemory.returnedWindows, ctx) : matches;
+    const matchesDeduped = updatedMemory && !locateMode ? dedupWindows(matches, updatedMemory.returnedWindows, ctx) : matches;
 
     const matchesWithTokens = matchesDeduped.map((m) => ({ ...m, estimatedTokens: m.kind === "match" && m.content ? estimateTokens(m.content) : 0 }));
 
@@ -254,7 +259,9 @@ export class SearchEngine {
       errors,
     );
 
-    const actualTokens = matchesWithTokens.reduce((s, m) => s + m.estimatedTokens, 0);
+    const actualTokens = locateMode
+      ? estimatedTokensTotal
+      : matchesWithTokens.reduce((s, m) => s + m.estimatedTokens, 0);
 
     const windowsDedupedAcrossCalls = matchesDeduped.filter(m => m.kind === "reference").length;
     const tokensDeduped = estimateReferenceTokens(matchesDeduped);
@@ -262,7 +269,7 @@ export class SearchEngine {
     this.host.recordStat({
       toolCall: "ParecodeSearch",
       pattern: patterns.join("|"),
-      truncate: "v1-text",
+      truncate: locateMode ? "v1-locate" : "v1-text",
       filesMatched: matches.length,
       estimatedNativeTokens,
       actualTokens,
@@ -277,7 +284,7 @@ export class SearchEngine {
       return await this.spill(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, errors, estimatedTokensTotal, patterns, paths, warnings);
     }
 
-    if (updatedMemory && matchesWithTokens.length > 0) {
+    if (updatedMemory && !locateMode && matchesWithTokens.length > 0) {
       const now = Date.now();
       const callId = `${sessionId}-${now}`;
       const returned: ReturnedWindow[] = [];
@@ -294,7 +301,7 @@ export class SearchEngine {
       }
     }
 
-    const summary = matchesWithTokens.length > 10 ? topSummary(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, SPILL_SUMMARY_SIZE) : undefined;
+    const summary = !locateMode && matchesWithTokens.length > 10 ? topSummary(matchesWithTokens as Array<SearchMatch & { estimatedTokens: number }>, SPILL_SUMMARY_SIZE) : undefined;
 
     let spillReminder;
     if (updatedMemory) {
@@ -481,6 +488,18 @@ export class SearchEngine {
     }
     return result;
   }
+}
+
+function dedupeAndSortHits(hits: SearchHit[]): SearchHit[] {
+  const seen = new Set<string>();
+  return hits
+    .filter((h) => {
+      const k = `${h.line}:${h.matchText}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .sort((a, b) => a.line - b.line);
 }
 
 function topSummary(matches: Array<SearchMatch & { estimatedTokens: number }>, k: number): SummaryEntry[] {

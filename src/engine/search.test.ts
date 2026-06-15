@@ -150,6 +150,33 @@ describe("SearchEngine", () => {
     expect((result.matches as SearchMatch[])?.map((m) => m.file).sort()).toEqual(["a.ts", "b.ts"]);
   });
 
+  it("mode 'locate' returns hits only — no content, empty lineRanges, v1-locate stat", async () => {
+    const stdout = toRgJson([
+      { type: "context", file: "a.ts", line: 1, text: "line1\n" },
+      { type: "match", file: "a.ts", line: 2, text: "needle here\n" },
+      { type: "match", file: "b.ts", line: 9, text: "needle there\n" },
+    ]);
+    const recordStat = vi.fn();
+    const host = makeHost({
+      exec: vi.fn().mockResolvedValue({ stdout, stderr: "", code: 0 }),
+      recordStat,
+    });
+    const engine = new SearchEngine(host);
+
+    const result = await engine.search({ pattern: "needle", mode: "locate" });
+
+    expect(result.status).toBe("success");
+    const matches = result.matches as SearchMatch[];
+    expect(matches).toHaveLength(2);
+    for (const m of matches) {
+      expect(m.content).toBeUndefined();
+      expect(m.lineRanges).toEqual([]);
+    }
+    const a = matches.find((m) => m.file === "a.ts")!;
+    expect(a.hits).toEqual([{ line: 2, matchText: "needle here" }]);
+    expect(recordStat).toHaveBeenCalledWith(expect.objectContaining({ truncate: "v1-locate" }));
+  });
+
   it("records actualTokens equal to ceil(total content length / 4)", async () => {
     const stdout = toRgJson([
       { type: "match", file: "a.ts", line: 1, text: "abcd\n" },

@@ -25,7 +25,7 @@ export const ParecodeEditToolSpec: ToolSpec = {
           properties: {
             file: {
               type: "string",
-              description: "Path (absolute or relative) to the file to edit. Edits are grouped by file and applied all-or-nothing per file; the per-file status is one of success, conflict (file changed underneath the edit), error, snippet_mismatch, or fuzzy_match_failed."
+              description: "Path (absolute or relative) to the file to edit. Edits are grouped by file and applied all-or-nothing per file; the per-file status is one of success, conflict (file changed underneath the edit), error, snippet_mismatch, or fuzzy_match_failed. On snippet_mismatch the op result carries an `actual` snapshot (line-numbered current contents at the target) so you can correct the anchor/line numbers in place without re-reading the file."
             },
             replaceLines: {
               type: "array",
@@ -44,7 +44,7 @@ export const ParecodeEditToolSpec: ToolSpec = {
             },
             expect: {
               type: "string",
-              description: "Anchor verifying the target before any write: the trimmed first line, or first and last line joined by `\\n…\\n` for ranges. If the lines drifted, the first-line anchor is re-located within ±20 lines, the range keeps its original length, and the last-line anchor is re-verified at the new position; if the anchor is missing or matches more than one nearby location, the op returns snippet_mismatch and nothing in that file is written."
+              description: "Anchor verifying the target before any write: the trimmed first line, or first and last line joined by `\\n…\\n` for ranges. If the lines drifted, the first-line anchor is re-located within ±20 lines, the range keeps its original length, and the last-line anchor is re-verified at the new position. Relocating a multi-line replaceLines range requires the two-ended (`\\n…\\n`) form — a single-line anchor that has drifted returns snippet_mismatch rather than overwriting an unverified range. If the anchor is missing or matches more than one nearby location, the op returns snippet_mismatch and nothing in that file is written."
             },
             oldString: {
               type: "string",
